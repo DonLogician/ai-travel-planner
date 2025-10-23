@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=AI Travel Planner
+      - DEBUG=True
+      - HOST=0.0.0.0
+      - PORT=8000
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - IFLYTEK_APP_ID=${IFLYTEK_APP_ID}
+      - IFLYTEK_API_KEY=${IFLYTEK_API_KEY}
+      - IFLYTEK_API_SECRET=${IFLYTEK_API_SECRET}
+      - AMAP_API_KEY=${AMAP_API_KEY}
+      - QWEN_API_KEY=${QWEN_API_KEY}
+      - QWEN_MODEL=${QWEN_MODEL:-qwen-turbo}
+      - DOUBAO_API_KEY=${DOUBAO_API_KEY}
+      - DOUBAO_MODEL=${DOUBAO_MODEL:-doubao-pro}
+      - LLM_PROVIDER=${LLM_PROVIDER:-qwen}
+      - SECRET_KEY=${SECRET_KEY:-change-this-secret-key}
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host
+
+volumes:
+  backend_data:

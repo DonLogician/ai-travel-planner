@@ -1,190 +1,148 @@
-# AI Travel Planner
-
-A comprehensive AI-powered travel planning platform with personalized itinerary generation and smart expense tracking.
-
-## Features
-
-### 🤖 AI-Powered Itinerary Generation
-- Generate personalized day-by-day travel plans using advanced LLM models (Qwen or Doubao)
-- Customizable based on destination, dates, budget, and travel preferences
-- Detailed activity suggestions with time schedules and estimated costs
-
-### 💰 Smart Expense Tracking
-- Track travel expenses by category (accommodation, food, transportation, activities, shopping)
-- Real-time budget monitoring with planned vs. actual spending comparison
-- Expense summary with category breakdowns
-
-### 🗺️ Navigation & Location Services
-- Integrated with Amap (高德地图) API for location search
-- Route planning with multiple transport modes (walking, transit, driving)
-- Distance and duration estimates
-
-### 🎤 Voice Recognition
-- Voice input powered by iFlytek API
-- Support for multiple languages
-- Hands-free expense entry and destination search
-
-## Tech Stack
-
-### Backend
-- **Framework**: FastAPI (Python)
-- **Database & Auth**: Supabase
-- **LLM Integration**: Qwen (Alibaba Cloud) / Doubao (ByteDance)
-- **APIs**: 
-  - iFlytek for voice recognition
-  - Amap for navigation and location services
-
-### Frontend
-- **Framework**: Vue.js 3
-- **Build Tool**: Vite
-- **State Management**: Pinia
-- **Routing**: Vue Router
-- **HTTP Client**: Axios
-
-## Project Structure
-
-```
 ai-travel-planner/
-├── backend/                    # Python FastAPI backend
-│   ├── app/
-│   │   ├── api/               # API endpoints
-│   │   │   ├── itinerary.py   # Itinerary endpoints
-│   │   │   ├── expense.py     # Expense tracking endpoints
-│   │   │   ├── navigation.py  # Navigation/location endpoints
-│   │   │   └── voice.py       # Voice recognition endpoint
-│   │   ├── core/              # Core configuration
-│   │   │   ├── config.py      # Settings and configuration
-│   │   │   └── database.py    # Database connection
-│   │   ├── services/          # Business logic services
-│   │   │   ├── travel_service.py     # Main travel service orchestrator
-│   │   │   ├── llm_service.py        # LLM integration for itinerary generation
-│   │   │   ├── expense_service.py    # Expense tracking logic
-│   │   │   ├── navigation_service.py # Amap API integration
-│   │   │   └── voice_service.py      # iFlytek API integration
-│   │   └── schemas/           # Pydantic models
-│   │       ├── itinerary.py   # Itinerary schemas
-│   │       ├── expense.py     # Expense schemas
-│   │       ├── location.py    # Location/navigation schemas
-│   │       └── user.py        # User and voice schemas
-│   ├── tests/                 # Backend tests
-│   ├── requirements.txt       # Python dependencies
-│   └── .env.example          # Environment variables template
-├── frontend/                  # Vue.js frontend
-│   ├── src/
-│   │   ├── views/            # Page components
-│   │   │   ├── Home.vue
-│   │   │   ├── CreateItinerary.vue
-│   │   │   ├── ItineraryList.vue
-│   │   │   ├── ItineraryDetail.vue
-│   │   │   └── ExpenseTracker.vue
-│   │   ├── services/         # API services
-│   │   │   ├── api.js
-│   │   │   ├── itinerary.js
-│   │   │   ├── expense.js
-│   │   │   ├── navigation.js
-│   │   │   └── voice.js
-│   │   ├── stores/           # Pinia stores
-│   │   │   ├── itinerary.js
-│   │   │   └── expense.js
-│   │   ├── router/           # Vue Router config
-│   │   └── App.vue           # Main app component
-│   ├── package.json
-│   └── .env                  # Frontend environment variables
-└── README.md
+# AI 旅行规划助手
+
+一个面向中文用户的智能旅行规划平台，通过大语言模型理解需求、自动生成行程，并提供预算管理、地图导航与语音交互等全流程辅助工具。本项目为“大模型辅助软件工程”课程作业，包含前后端完整实现与相关文档。
+
+## 目录
+- [功能亮点](#功能亮点)
+- [系统架构](#系统架构)
+- [环境准备](#环境准备)
+- [快速开始](#快速开始)
+- [环境变量说明](#环境变量说明)
+- [数据库结构](#数据库结构)
+- [常用命令](#常用命令)
+- [常见问题](#常见问题)
+- [更多资料](#更多资料)
+
+## 功能亮点
+- **智能行程规划**：支持语音或文字输入需求，使用千问（Qwen）或豆包（Doubao）大模型生成“日程+预算+推荐”的完整旅行方案。
+- **实时预算监管**：记录开销、对比预算，分类统计并可视化展示超支风险。
+- **语音驱动体验**：集成科大讯飞语音识别，实现语音规划与语音记账。
+- **地图与路线**：调用高德地图 API，提供 POI 搜索与多种出行方式的路线规划。
+- **云端同步**：基于 Supabase 存储行程与费用，可在多设备查看与更新。
+- **完整栈实现**：FastAPI + Vue3 + Pinia + Vite，配套 Docker Compose、测试与中文文档。
+
+更多交互细节与界面设想请参阅 `FEATURES.md` 与 `PRD.md`。
+
+## 系统架构
 ```
+用户 → 前端（Vue3 + Vite） → 后端（FastAPI） → 外部服务
+                                      ├─ Supabase（数据库/认证）
+                                      ├─ 千问 / 豆包（行程 AI）
+                                      ├─ 高德地图（导航）
+                                      └─ 科大讯飞（语音识别）
+```
+- 前端：SPA 架构，Pinia 管理跨页状态，Axios 服务层统一封装 API。
+- 后端：服务化设计（行程、费用、导航、语音、LLM 等），统一通过 FastAPI 暴露 RESTful 接口。
+- 数据库：Supabase（PostgreSQL），提供行程与费用两张核心表，后续可扩展用户体系。
+- DevOps：Dockerfile + docker-compose，一键启动开发环境；`setup.sh` 支持类 Unix 环境快速初始化。
 
-## Setup Instructions
+架构细节参见 `ARCHITECTURE.md`。
 
-### Prerequisites
-- Python 3.8+
-- Node.js 18+ and npm
-- Supabase account
-- API keys for:
-  - Qwen (Alibaba Cloud) or Doubao (ByteDance)
-  - Amap (高德地图)
-  - iFlytek (optional, for voice features)
+## 环境准备
+| 组件           | 版本建议 | 备注                          |
+| -------------- | -------- | ----------------------------- |
+| Python         | 3.10+    | 推荐通过 Conda 管理环境       |
+| Node.js        | 18+      | 搭配 npm                      |
+| Docker Desktop | 最新版   | 启用 WSL2 后端（Windows）     |
+| Supabase 账号  | -        | 需创建项目与数据库表          |
+| API Key        | -        | 千问/豆包、高德、讯飞均需申请 |
 
-### Backend Setup
+> **Windows 用户建议**：优先使用 PowerShell + Conda 或 WSL；若运行 `setup.sh`，请在 WSL/Git Bash 中执行。
 
-1. Navigate to the backend directory:
-```bash
+## 快速开始
+
+### 方案一：Docker Compose（推荐）
+```powershell
+# 1. 在仓库根目录填写 .env 与 backend/.env（详见下节）
+# 2. 构建并启动服务
+docker compose up --build
+
+# 后续启动可省略 --build
+docker compose up
+
+# 停止服务
+docker compose down
+```
+- 前端：<http://localhost:5173>
+- 后端 API：<http://localhost:8000/api>
+- Swagger 文档：<http://localhost:8000/api/docs>
+
+### 方案二：本地开发（Conda + npm）
+```powershell
+# backend
+conda create -n ai-travel-planner python=3.10 -y
+conda activate ai-travel-planner
 cd backend
-```
-
-2. Create a virtual environment and activate it:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
+pip install --upgrade pip
 pip install -r requirements.txt
+python -m uvicorn app.main:app --reload
+
+# frontend（另开终端）
+cd frontend
+npm install
+npm run dev -- --host
 ```
 
-4. Create a `.env` file from the example:
-```bash
-cp .env.example .env
-```
+## 环境变量说明
+项目已提供示例 `.env` 文件，请根据实际凭据替换其中的示例值。
 
-5. Configure your `.env` file with your API keys and settings:
+### 根目录 `.env`
 ```env
-# Supabase Configuration
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
-
-# iFlytek API Configuration (Optional)
-IFLYTEK_APP_ID=your_iflytek_app_id
-IFLYTEK_API_KEY=your_iflytek_api_key
-IFLYTEK_API_SECRET=your_iflytek_api_secret
-
-# Amap API Configuration
-AMAP_API_KEY=your_amap_api_key
-
-# LLM Configuration (Choose one)
-# For Qwen (Alibaba Cloud)
-QWEN_API_KEY=your_qwen_api_key
+SUPABASE_URL=...
+SUPABASE_KEY=...
+IFLYTEK_APP_ID=...
+IFLYTEK_API_KEY=...
+IFLYTEK_API_SECRET=...
+AMAP_API_KEY=...
+QWEN_API_KEY=...
 QWEN_MODEL=qwen-turbo
-
-# For Doubao (ByteDance)
 DOUBAO_API_KEY=your_doubao_api_key
 DOUBAO_MODEL=doubao-pro
-
-# Use which LLM provider: qwen or doubao
 LLM_PROVIDER=qwen
-
-# Secret Key for JWT
-SECRET_KEY=your-secret-key-change-this-in-production
+SECRET_KEY=...
 ```
 
-6. Set up Supabase database tables:
+### `backend/.env`
+包含应用基础配置（端口、DEBUG 等），以及与根目录相同的密钥字段。若修改，请保持两个文件同步或在 docker-compose 中单独配置。
 
-Create the following tables in your Supabase project:
+> **提示**：`SECRET_KEY` 已预置随机值，建议本地或生产环境重新生成。示例命令：
+```powershell
+python - <<'PY'
+import secrets
+print(secrets.token_urlsafe(48))
+PY
+```
 
-**itineraries table:**
+### `frontend/.env`
+```
+VITE_API_BASE_URL=http://localhost:8000/api
+```
+如部署到其他域名，请同步修改。
+
+## 数据库结构
+在 Supabase SQL Editor 中执行以下语句（需启用 `uuid-ossp` 扩展或使用 Supabase 默认 UUID）。
+
 ```sql
-CREATE TABLE itineraries (
+CREATE TABLE IF NOT EXISTS itineraries (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id TEXT NOT NULL,
   destination TEXT NOT NULL,
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
-  budget DECIMAL NOT NULL,
+  budget NUMERIC NOT NULL,
   daily_itinerary JSONB NOT NULL,
-  total_estimated_cost DECIMAL NOT NULL,
+  total_estimated_cost NUMERIC NOT NULL,
   recommendations TEXT,
   created_at TIMESTAMP DEFAULT NOW()
 );
-```
 
-**expenses table:**
-```sql
-CREATE TABLE expenses (
+CREATE TABLE IF NOT EXISTS expenses (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id TEXT NOT NULL,
-  itinerary_id UUID REFERENCES itineraries(id),
+  itinerary_id UUID REFERENCES itineraries(id) ON DELETE CASCADE,
   category TEXT NOT NULL,
-  amount DECIMAL NOT NULL,
+  amount NUMERIC NOT NULL,
   description TEXT NOT NULL,
   date TIMESTAMP NOT NULL,
   location TEXT,
@@ -193,162 +151,29 @@ CREATE TABLE expenses (
 );
 ```
 
-7. Run the backend server:
-```bash
-cd app
-python -m uvicorn main:app --reload
-```
+可选：根据需要开启 Row Level Security，并为匿名访问配置策略。
 
-The API will be available at `http://localhost:8000`
-- API Documentation: `http://localhost:8000/api/docs`
-- Alternative docs: `http://localhost:8000/api/redoc`
+## 常用命令
+| 目的             | 命令                                      |
+| ---------------- | ----------------------------------------- |
+| 运行后端（开发） | `python -m uvicorn app.main:app --reload` |
+| 运行前端（开发） | `npm run dev -- --host`                   |
+| 后端测试         | `pytest tests -v`                         |
+| 前端测试         | `npm run test`                            |
+| 构建前端产物     | `npm run build`                           |
+| Docker 全量构建  | `docker compose up --build`               |
 
-### Frontend Setup
+## 常见问题
+- **API Key 放在哪？** 所有敏感信息请写入 `.env` 文件并加入 `.gitignore`；远程部署请使用 CI/CD Secret 管理。
+- **语音功能未生效？** 检查讯飞控制台是否启用对应接口，网络是否能够访问 `www.xfyun.cn`，并确定上传音频格式符合要求（默认 16k PCM）。
+- **行程生成超时？** 大模型调用存在 6~8 秒延迟，建议在前端展示加载动画，同时在后端设置合理的超时与重试。
+- **数据库报错 uuid_generate_v4 不存在？** 在 Supabase 执行 `CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`。
 
-1. Navigate to the frontend directory:
-```bash
-cd frontend
-```
+## 更多资料
+- `PRD.md`：完整产品需求说明
+- `ARCHITECTURE.md`：系统架构与技术细节
+- `API.md`：后端 REST API 文档（含请求示例）
+- `FEATURES.md`：前端交互设计与功能拆解
+- `PROJECT_SUMMARY.md`：阶段总结与后续展望
 
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Configure the `.env` file (already created with default values):
-```env
-VITE_API_BASE_URL=http://localhost:8000/api
-```
-
-4. Run the development server:
-```bash
-npm run dev
-```
-
-The frontend will be available at `http://localhost:5173`
-
-## Usage
-
-### Creating an Itinerary
-
-1. Navigate to "Plan Trip" in the navigation menu
-2. Fill in your travel details:
-   - Destination
-   - Start and end dates
-   - Budget
-   - Travel preferences (cultural, food, adventure, etc.)
-   - Additional notes
-3. Click "Generate Itinerary"
-4. View your AI-generated day-by-day plan with activities and estimated costs
-
-### Tracking Expenses
-
-1. Navigate to "Expenses" in the navigation menu
-2. Click "+ Add Expense"
-3. Fill in expense details:
-   - Category (accommodation, food, transportation, etc.)
-   - Amount
-   - Description
-   - Location (optional)
-4. View expense summary and breakdown by category
-5. Compare against your planned budget in the itinerary detail view
-
-### Using Navigation Features
-
-The navigation features are integrated into the itinerary generation:
-- Location searches use Amap API for accurate results
-- Route planning suggests optimal transportation methods
-- Distance and time estimates help with planning
-
-### Voice Input (Optional)
-
-If you have configured iFlytek API credentials:
-- Use voice commands to quickly add expenses
-- Voice-enabled destination search
-- Hands-free interaction for better user experience
-
-## API Endpoints
-
-### Itineraries
-- `POST /api/itineraries/` - Create a new itinerary
-- `GET /api/itineraries/` - List all itineraries
-- `GET /api/itineraries/{id}` - Get specific itinerary
-- `DELETE /api/itineraries/{id}` - Delete an itinerary
-- `GET /api/itineraries/{id}/budget-status` - Get budget status
-
-### Expenses
-- `POST /api/expenses/` - Create a new expense
-- `GET /api/expenses/` - List expenses (with filters)
-- `GET /api/expenses/summary` - Get expense summary
-- `GET /api/expenses/{id}` - Get specific expense
-- `PUT /api/expenses/{id}` - Update an expense
-- `DELETE /api/expenses/{id}` - Delete an expense
-
-### Navigation
-- `POST /api/navigation/search` - Search for locations
-- `POST /api/navigation/route` - Get route information
-
-### Voice Recognition
-- `POST /api/voice/recognize` - Recognize speech from audio
-
-## Testing
-
-### Backend Tests
-```bash
-cd backend
-pytest tests/ -v
-```
-
-### Frontend Tests
-```bash
-cd frontend
-npm run test
-```
-
-## Development
-
-### Backend Development
-- The backend uses FastAPI with automatic API documentation
-- Follow the service-oriented architecture pattern
-- Add new endpoints in `app/api/`
-- Add business logic in `app/services/`
-- Define data models in `app/schemas/`
-
-### Frontend Development
-- Components should be modular and reusable
-- Use Pinia stores for state management
-- API calls go through service files in `src/services/`
-- Follow Vue 3 Composition API best practices
-
-## Production Deployment
-
-### Backend
-1. Set `DEBUG=False` in production `.env`
-2. Use a production-grade WSGI server like Gunicorn
-3. Set up proper CORS origins
-4. Use environment variables for all secrets
-5. Enable HTTPS
-
-### Frontend
-1. Build the production bundle:
-```bash
-npm run build
-```
-2. Serve the `dist` folder with a web server (nginx, Apache, etc.)
-3. Configure proper API base URL for production
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License.
-
-## Support
-
-For issues, questions, or contributions, please open an issue on GitHub.
-
----
-
-**Note**: This is a demonstration project. For production use, implement proper authentication, error handling, rate limiting, and security measures.
+欢迎在课程项目中基于本仓库进行扩展，若有问题可通过 Issue 反馈或提交 PR。

@@ -1,31 +1,23 @@
-# API Documentation
+# 接口文档
 
-## Base URL
-
+## 基本信息
 ```
-Development: http://localhost:8000/api
-Production: https://your-domain.com/api
+开发环境基地址：http://localhost:8000/api
+正式环境基地址：<部署后填入>
 ```
 
-## Authentication
-
-Currently using mock authentication. In production, all endpoints (except health check) should require JWT authentication.
-
-**Headers:**
+### 认证说明
+- 当前为课程作业，默认使用模拟用户。后续上线应启用 JWT，并在请求头添加：
 ```
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
 
-## Endpoints
+## 系统健康检查
+### GET /health
+用于监控服务状态。
 
-### Health Check
-
-#### GET /health
-
-Check API health status.
-
-**Response:**
+**响应示例**
 ```json
 {
   "status": "healthy",
@@ -36,440 +28,277 @@ Check API health status.
 
 ---
 
-## Itinerary Endpoints
+## 行程相关接口（/itineraries）
 
-### Create Itinerary
+### 1. 创建行程 - POST /itineraries/
+根据用户输入调用 LLM 生成行程，并写入数据库。
 
-#### POST /itineraries/
+**请求体参数**
+| 字段             | 类型          | 必填 | 说明                                  |
+| ---------------- | ------------- | ---- | ------------------------------------- |
+| destination      | string        | ✅    | 目的地（城市/地区名称）               |
+| start_date       | date          | ✅    | 开始日期，格式 YYYY-MM-DD             |
+| end_date         | date          | ✅    | 结束日期                              |
+| budget           | number        | ✅    | 旅行总预算（货币单位自定）            |
+| preferences      | array[string] | ❌    | 旅行偏好标签，如 `"food"`、`"family"` |
+| additional_notes | string        | ❌    | 其他补充需求                          |
 
-Generate a new AI-powered travel itinerary.
-
-**Request Body:**
+**返回示例（201）**
 ```json
 {
-  "destination": "Beijing",
-  "start_date": "2024-03-15",
-  "end_date": "2024-03-20",
-  "budget": 5000.0,
-  "preferences": ["cultural", "food"],
-  "additional_notes": "Prefer public transportation"
-}
-```
-
-**Parameters:**
-- `destination` (string, required): Destination city or location
-- `start_date` (date, required): Trip start date (YYYY-MM-DD)
-- `end_date` (date, required): Trip end date (YYYY-MM-DD)
-- `budget` (number, required): Total budget for the trip
-- `preferences` (array, optional): Travel preferences (cultural, adventure, relaxation, food, shopping, nature, nightlife)
-- `additional_notes` (string, optional): Additional user requirements
-
-**Response:** `201 Created`
-```json
-{
-  "id": "uuid-string",
-  "destination": "Beijing",
-  "start_date": "2024-03-15",
-  "end_date": "2024-03-20",
-  "budget": 5000.0,
+  "id": "uuid",
+  "destination": "东京",
+  "start_date": "2025-02-01",
+  "end_date": "2025-02-05",
+  "budget": 10000,
   "daily_itinerary": [
     {
       "day": 1,
-      "date": "2024-03-15",
+      "date": "2025-02-01",
       "activities": [
         {
           "time": "09:00",
-          "activity": "Visit Forbidden City",
-          "location": "Forbidden City",
-          "estimated_cost": 60.0,
-          "notes": "Book tickets in advance"
+          "activity": "浅草寺参观",
+          "location": "浅草寺",
+          "estimated_cost": 0,
+          "notes": "建议提前到场避开人流"
         }
       ],
-      "total_estimated_cost": 500.0
+      "total_estimated_cost": 800
     }
   ],
-  "total_estimated_cost": 2500.0,
-  "recommendations": "Use subway for transportation. Book accommodations in advance.",
-  "created_at": "2024-03-01T10:00:00"
+  "total_estimated_cost": 4200,
+  "recommendations": "建议提前预约热门餐厅，地铁交通最省时",
+  "created_at": "2025-01-10T12:00:00"
 }
 ```
 
-### List Itineraries
+### 2. 行程列表 - GET /itineraries/
+获取当前用户全部行程。
 
-#### GET /itineraries/
+**查询参数**
+| 参数  | 类型    | 说明                  |
+| ----- | ------- | --------------------- |
+| limit | integer | 返回数量上限，默认 20 |
 
-Get all itineraries for the current user.
-
-**Query Parameters:**
-- `limit` (integer, optional): Maximum number of results (default: 20)
-
-**Response:** `200 OK`
+**返回示例（200）**
 ```json
 [
   {
-    "id": "uuid-string",
-    "destination": "Beijing",
-    "start_date": "2024-03-15",
-    "end_date": "2024-03-20",
-    "budget": 5000.0,
+    "id": "uuid",
+    "destination": "东京",
+    "start_date": "2025-02-01",
+    "end_date": "2025-02-05",
+    "budget": 10000,
     "daily_itinerary": [...],
-    "total_estimated_cost": 2500.0,
-    "created_at": "2024-03-01T10:00:00"
+    "total_estimated_cost": 4200,
+    "created_at": "2025-01-10T12:00:00"
   }
 ]
 ```
 
-### Get Itinerary
+### 3. 行程详情 - GET /itineraries/{id}
+根据行程 ID 获取详情。
 
-#### GET /itineraries/{id}
+**路径参数**
+| 参数 | 类型   | 说明      |
+| ---- | ------ | --------- |
+| id   | string | 行程 UUID |
 
-Get a specific itinerary by ID.
-
-**Path Parameters:**
-- `id` (string, required): Itinerary UUID
-
-**Response:** `200 OK`
-```json
-{
-  "id": "uuid-string",
-  "destination": "Beijing",
-  "start_date": "2024-03-15",
-  "end_date": "2024-03-20",
-  "budget": 5000.0,
-  "daily_itinerary": [...],
-  "total_estimated_cost": 2500.0,
-  "recommendations": "...",
-  "created_at": "2024-03-01T10:00:00"
-}
-```
-
-**Error Response:** `404 Not Found`
+**错误响应（404）**
 ```json
 {
   "detail": "Itinerary not found"
 }
 ```
 
-### Delete Itinerary
+### 4. 删除行程 - DELETE /itineraries/{id}
+删除指定行程。
 
-#### DELETE /itineraries/{id}
+**成功响应**：204 No Content
 
-Delete an itinerary.
+### 5. 预算对比 - GET /itineraries/{id}/budget-status
+返回计划预算、AI 估算和实际支出对比。
 
-**Path Parameters:**
-- `id` (string, required): Itinerary UUID
-
-**Response:** `204 No Content`
-
-**Error Response:** `404 Not Found`
-
-### Get Budget Status
-
-#### GET /itineraries/{id}/budget-status
-
-Get budget status comparison (planned vs actual).
-
-**Path Parameters:**
-- `id` (string, required): Itinerary UUID
-
-**Response:** `200 OK`
+**返回示例（200）**
 ```json
 {
-  "itinerary_id": "uuid-string",
-  "planned_budget": 5000.0,
-  "estimated_cost": 2500.0,
-  "actual_spent": 1200.0,
-  "remaining": 3800.0,
-  "spent_percentage": 24.0,
+  "itinerary_id": "uuid",
+  "planned_budget": 10000,
+  "estimated_cost": 4200,
+  "actual_spent": 1800,
+  "remaining": 8200,
+  "spent_percentage": 18,
   "expense_breakdown": {
-    "food": 500.0,
-    "transportation": 300.0,
-    "accommodation": 400.0
+    "food": 600,
+    "transportation": 400,
+    "accommodation": 800
   }
 }
 ```
 
 ---
 
-## Expense Endpoints
+## 费用相关接口（/expenses）
 
-### Create Expense
+### 1. 新增费用 - POST /expenses/
 
-#### POST /expenses/
+**请求体参数**
+| 字段         | 类型     | 必填 | 说明                                                                          |
+| ------------ | -------- | ---- | ----------------------------------------------------------------------------- |
+| itinerary_id | string   | ❌    | 对应行程 ID，可为空（独立记账）                                               |
+| category     | string   | ✅    | 分类：`accommodation`/`food`/`transportation`/`activities`/`shopping`/`other` |
+| amount       | number   | ✅    | 金额                                                                          |
+| description  | string   | ✅    | 描述                                                                          |
+| date         | datetime | ❌    | 发生时间，默认当前时间                                                        |
+| location     | string   | ❌    | 地点                                                                          |
 
-Create a new expense record.
-
-**Request Body:**
+**返回示例（201）**
 ```json
 {
-  "itinerary_id": "uuid-string",
+  "id": "uuid",
+  "user_id": "user-1",
+  "itinerary_id": "uuid",
   "category": "food",
   "amount": 120.5,
-  "description": "Dinner at local restaurant",
-  "location": "Beijing"
+  "description": "晚餐-筑地寿司",
+  "date": "2025-02-01T19:30:00",
+  "location": "东京",
+  "created_at": "2025-02-01T20:00:00",
+  "updated_at": "2025-02-01T20:00:00"
 }
 ```
 
-**Parameters:**
-- `itinerary_id` (string, optional): Associated itinerary UUID
-- `category` (string, required): Category (accommodation, food, transportation, activities, shopping, other)
-- `amount` (number, required): Expense amount
-- `description` (string, required): Description
-- `date` (datetime, optional): Expense date (defaults to now)
-- `location` (string, optional): Location where expense occurred
+### 2. 费用列表 - GET /expenses/
 
-**Response:** `201 Created`
+**查询参数**
+| 参数         | 类型    | 说明                   |
+| ------------ | ------- | ---------------------- |
+| itinerary_id | string  | 按行程筛选             |
+| category     | string  | 按分类筛选             |
+| limit        | integer | 返回数量上限，默认 100 |
+
+### 3. 费用汇总 - GET /expenses/summary
+返回总额与按分类聚合结果。
+
 ```json
 {
-  "id": "uuid-string",
-  "user_id": "user-id",
-  "itinerary_id": "uuid-string",
-  "category": "food",
-  "amount": 120.5,
-  "description": "Dinner at local restaurant",
-  "date": "2024-03-15T19:30:00",
-  "location": "Beijing",
-  "created_at": "2024-03-15T20:00:00",
-  "updated_at": "2024-03-15T20:00:00"
-}
-```
-
-### List Expenses
-
-#### GET /expenses/
-
-List expenses with optional filters.
-
-**Query Parameters:**
-- `itinerary_id` (string, optional): Filter by itinerary
-- `category` (string, optional): Filter by category
-- `limit` (integer, optional): Maximum number of results (default: 100)
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "id": "uuid-string",
-    "user_id": "user-id",
-    "itinerary_id": "uuid-string",
-    "category": "food",
-    "amount": 120.5,
-    "description": "Dinner at local restaurant",
-    "date": "2024-03-15T19:30:00",
-    "location": "Beijing",
-    "created_at": "2024-03-15T20:00:00"
-  }
-]
-```
-
-### Get Expense Summary
-
-#### GET /expenses/summary
-
-Get expense summary with category breakdown.
-
-**Query Parameters:**
-- `itinerary_id` (string, optional): Filter by itinerary
-
-**Response:** `200 OK`
-```json
-{
-  "total_expenses": 1500.0,
+  "total_expenses": 1500,
   "by_category": {
-    "food": 500.0,
-    "transportation": 300.0,
-    "accommodation": 600.0,
-    "activities": 100.0
+    "food": 500,
+    "transportation": 300,
+    "accommodation": 600,
+    "activities": 100
   },
   "count": 15
 }
 ```
 
-### Get Expense
+### 4. 查看/更新/删除单条费用
+- GET /expenses/{id}
+- PUT /expenses/{id}
+  ```json
+  {
+    "category": "shopping",
+    "amount": 150,
+    "description": "纪念品"
+  }
+  ```
+- DELETE /expenses/{id}
 
-#### GET /expenses/{id}
-
-Get a specific expense by ID.
-
-**Path Parameters:**
-- `id` (string, required): Expense UUID
-
-**Response:** `200 OK`
-
-### Update Expense
-
-#### PUT /expenses/{id}
-
-Update an existing expense.
-
-**Path Parameters:**
-- `id` (string, required): Expense UUID
-
-**Request Body:**
-```json
-{
-  "category": "shopping",
-  "amount": 150.0,
-  "description": "Updated description"
-}
-```
-
-**Response:** `200 OK`
-
-### Delete Expense
-
-#### DELETE /expenses/{id}
-
-Delete an expense.
-
-**Path Parameters:**
-- `id` (string, required): Expense UUID
-
-**Response:** `204 No Content`
+成功删除返回 204。
 
 ---
 
-## Navigation Endpoints
+## 导航接口（/navigation）
 
-### Search Location
+### 1. 地点搜索 - POST /navigation/search
+调用高德 POI 搜索。
 
-#### POST /navigation/search
-
-Search for locations using Amap API.
-
-**Request Body:**
 ```json
 {
-  "query": "Forbidden City",
-  "city": "Beijing"
+  "query": "浅草寺",
+  "city": "东京"
 }
 ```
 
-**Parameters:**
-- `query` (string, required): Search query
-- `city` (string, optional): City to search in
-
-**Response:** `200 OK`
+**响应示例**
 ```json
 [
   {
-    "name": "Forbidden City",
-    "address": "4 Jingshan Front St, Dongcheng, Beijing",
-    "longitude": 116.397026,
-    "latitude": 39.918058
+    "name": "浅草寺",
+    "address": "日本东京都台东区浅草2-3-1",
+    "longitude": 139.796655,
+    "latitude": 35.714765
   }
 ]
 ```
 
-### Get Route
+### 2. 路线规划 - POST /navigation/route
 
-#### POST /navigation/route
-
-Get route information between two locations.
-
-**Request Body:**
 ```json
 {
-  "origin": "Beijing Railway Station",
-  "destination": "Forbidden City",
+  "origin": "东京站",
+  "destination": "浅草寺",
   "mode": "transit"
 }
 ```
 
-**Parameters:**
-- `origin` (string, required): Starting point
-- `destination` (string, required): Destination
-- `mode` (string, optional): Travel mode (walking, transit, driving) - default: transit
-
-**Response:** `200 OK`
+**响应示例**
 ```json
 {
-  "distance": 3.5,
-  "duration": 25.0,
+  "distance": 5.2,
+  "duration": 28,
   "steps": [
-    "Head north on Beijing Railway Station",
-    "Take subway line 2",
-    "Get off at Tiananmen East",
-    "Walk to Forbidden City"
+    "从东京站乘坐丸之内线到银座站",
+    "步行换乘银座线到浅草站",
+    "步行 400 米抵达浅草寺"
   ]
 }
 ```
 
 ---
 
-## Voice Recognition Endpoints
+## 语音接口（/voice）
 
-### Recognize Speech
+### 语音识别 - POST /voice/recognize
+调用科大讯飞语音转写。
 
-#### POST /voice/recognize
-
-Convert speech to text using iFlytek API.
-
-**Request Body:**
+**请求体**
 ```json
 {
-  "audio_data": "base64_encoded_audio_string",
+  "audio_data": "<base64 编码音频>",
   "language": "zh_cn"
 }
 ```
+- `audio_data`：必填，建议 16k PCM 或 WAV 转 Base64。
+- `language`：可选，默认 `zh_cn`。
 
-**Parameters:**
-- `audio_data` (string, required): Base64 encoded audio data
-- `language` (string, optional): Language code (default: zh_cn)
-
-**Response:** `200 OK`
+**响应示例（200）**
 ```json
 {
-  "text": "我想去北京旅游三天",
-  "confidence": 0.95
+  "text": "我想去东京玩五天，预算一万块",
+  "confidence": 0.92
 }
 ```
 
 ---
 
-## Error Responses
-
-All endpoints may return the following error responses:
-
-### 400 Bad Request
-```json
-{
-  "detail": "Invalid request parameters"
-}
-```
-
-### 401 Unauthorized
-```json
-{
-  "detail": "Not authenticated"
-}
-```
-
-### 404 Not Found
-```json
-{
-  "detail": "Resource not found"
-}
-```
-
-### 500 Internal Server Error
-```json
-{
-  "detail": "Internal server error: <error message>"
-}
-```
+## 错误码约定
+| 状态码 | 含义              | 返回示例                                     |
+| ------ | ----------------- | -------------------------------------------- |
+| 400    | 参数错误          | `{ "detail": "Invalid request parameters" }` |
+| 401    | 未认证/Token 失效 | `{ "detail": "Not authenticated" }`          |
+| 404    | 资源不存在        | `{ "detail": "Resource not found" }`         |
+| 500    | 服务器异常        | `{ "detail": "Internal server error: ..." }` |
 
 ---
 
-## Rate Limiting
+## 限流建议（生产环境）
+- 行程生成：10 次/分钟/用户
+- 导航请求：50 次/分钟/用户
+- 费用操作：100 次/分钟/用户
 
-Rate limiting is not currently implemented but recommended for production:
-- 100 requests per minute per user for general endpoints
-- 10 requests per minute for AI-powered itinerary generation
-- 50 requests per minute for expense tracking
-
-## API Documentation
-
-Interactive API documentation is available at:
-- Swagger UI: `http://localhost:8000/api/docs`
-- ReDoc: `http://localhost:8000/api/redoc`
+## 在线文档
+ - Swagger UI：`http://localhost:8000/api/docs`
+ - ReDoc：`http://localhost:8000/api/redoc`

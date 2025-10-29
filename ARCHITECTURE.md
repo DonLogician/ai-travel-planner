@@ -1,297 +1,171 @@
-# AI Travel Planner - Architecture Documentation
+# AI 旅行规划助手 - 架构说明
 
-## System Overview
+## 1. 系统概览
+AI 旅行规划助手是一个全栈 Web 应用，前端负责用户交互与可视化，后端提供行程生成、预算管理、语音识别、地图导航等服务，并整合多个第三方 API（千问/豆包、高德、讯飞、Supabase）。
 
-The AI Travel Planner is a full-stack web application that leverages artificial intelligence to generate personalized travel itineraries and track expenses. The system integrates multiple external APIs for enhanced functionality.
-
-## Architecture Diagram
-
+## 2. 架构示意
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Frontend (Vue.js)                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │   Home View  │  │  Itinerary   │  │   Expense    │          │
-│  │              │  │  Management  │  │   Tracker    │          │
-│  └──────────────┘  └──────────────┘  └──────────────┘          │
-│                                                                   │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │              Pinia Stores (State Management)              │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                                                   │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │          API Services (Axios HTTP Client)                 │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              │ HTTP/HTTPS
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     Backend (FastAPI)                            │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │                    API Endpoints                          │  │
-│  │  - Itinerary API  - Expense API  - Navigation API        │  │
-│  │  - Voice API      - Auth API (future)                    │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                              │                                   │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │                  Service Layer                            │  │
-│  │  ┌─────────────────┐  ┌─────────────────┐               │  │
-│  │  │ Travel Service  │  │ Expense Service │               │  │
-│  │  │ (Orchestrator)  │  │                 │               │  │
-│  │  └─────────────────┘  └─────────────────┘               │  │
-│  │  ┌─────────────────┐  ┌─────────────────┐               │  │
-│  │  │  LLM Service    │  │ Navigation Svc  │               │  │
-│  │  │  (Qwen/Doubao)  │  │  (Amap API)     │               │  │
-│  │  └─────────────────┘  └─────────────────┘               │  │
-│  │  ┌─────────────────┐                                     │  │
-│  │  │  Voice Service  │                                     │  │
-│  │  │  (iFlytek API)  │                                     │  │
-│  │  └─────────────────┘                                     │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    External Services                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │   Supabase   │  │  Qwen/Doubao │  │  Amap API    │          │
-│  │  (Database   │  │     (LLM)    │  │ (Navigation) │          │
-│  │   & Auth)    │  │              │  │              │          │
-│  └──────────────┘  └──────────────┘  └──────────────┘          │
-│  ┌──────────────┐                                               │
-│  │  iFlytek API │                                               │
-│  │  (Voice)     │                                               │
-│  └──────────────┘                                               │
-└─────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│                        前端（Vue 3）                        │
+│  ┌───────────┐  ┌──────────────┐  ┌──────────────┐         │
+│  │   首页    │  │  行程管理视图 │  │  费用追踪视图 │         │
+│  └───────────┘  └──────────────┘  └──────────────┘         │
+│        │                   │                   │             │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │            Pinia 全局状态（行程 / 费用）              │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │         Axios 服务层（itinerary/expense 等）          │   │
+│  └──────────────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────────────────┘
+                                             │HTTP/HTTPS
+                                             ▼
+┌────────────────────────────────────────────────────────────┐
+│                     后端（FastAPI）                         │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │                  REST API 路由                         │  │
+│  │  /itineraries  /expenses  /navigation  /voice         │  │
+│  └──────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │                    Service 层                         │  │
+│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐       │  │
+│  │  │ TravelSvc  │  │ ExpenseSvc │  │ LLM Svc    │       │  │
+│  │  └────────────┘  └────────────┘  └────────────┘       │  │
+│  │        ┌────────────┐  ┌────────────┐                 │  │
+│  │        │ Nav Svc    │  │ Voice Svc  │                 │  │
+│  │        └────────────┘  └────────────┘                 │  │
+│  └──────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────┘
+                                             │
+                                             ▼
+┌────────────────────────────────────────────────────────────┐
+│                      外部服务与资源                         │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐           │
+│  │ Supabase   │  │ 千问/豆包   │  │ 高德地图   │           │
+│  │ (DB/Auth)  │  │ (LLM)      │  │ (导航/POI) │           │
+│  └────────────┘  └────────────┘  └────────────┘           │
+│                      ┌────────────┐                       │
+│                      │ 科大讯飞    │                       │
+│                      │ (语音识别)  │                       │
+│                      └────────────┘                       │
+└────────────────────────────────────────────────────────────┘
 ```
 
-## Component Details
+## 3. 前端层
+- **技术栈**：Vue 3 (Composition API)、Vite、Pinia、Vue Router、Axios。
+- **视图组件**：
+   - `Home.vue`：展示核心功能与快捷入口。
+   - `CreateItinerary.vue`：引导式行程创建表单，集成偏好选择与地图搜索。
+   - `ItineraryList.vue`：行程列表与筛选。
+   - `ItineraryDetail.vue`：日程时间线、预算对比、地图预览。
+   - `ExpenseTracker.vue`：费用录入与可视化统计。
+- **状态管理**：
+   - `stores/itinerary.js`：缓存行程，支持增删查与预算状态获取。
+   - `stores/expense.js`：管理费用记录、汇总与筛选条件。
+- **服务层**：`src/services/*.js` 对应后端 REST 接口，统一处理请求、错误、鉴权等逻辑。
 
-### Frontend Layer (Vue.js 3)
+## 4. 后端层
+- **技术栈**：FastAPI、Pydantic、HTTPX、Supabase Python SDK、Uvicorn。
+- **架构模式**：面向服务的分层架构（API 路由 → Service → 外部依赖/数据库）。
+- **核心服务**：
+   1. **TravelService**：行程主流程协调，校验输入，调用 LLM 生成行程，写入 Supabase。
+   2. **LLMService**：对接千问/豆包 API，封装 Prompt、补全逻辑与异常处理。
+   3. **ExpenseService**：费用 CRUD、类别统计、预算对比数据输出。
+   4. **NavigationService**：对接高德地图地点搜索与路线规划接口，统一返回坐标与步骤。
+   5. **VoiceService**：封装科大讯飞语音识别，支持 Base64 音频上传。
 
-**Technology Stack:**
-- Vue.js 3 with Composition API
-- Vite for build tooling
-- Pinia for state management
-- Vue Router for navigation
-- Axios for HTTP requests
-
-**Key Components:**
-1. **Views**
-   - `Home.vue`: Landing page with feature overview
-   - `CreateItinerary.vue`: Form for itinerary generation
-   - `ItineraryList.vue`: Display all user itineraries
-   - `ItineraryDetail.vue`: Detailed view of a single itinerary
-   - `ExpenseTracker.vue`: Expense management interface
-
-2. **Services**
-   - API client configuration
-   - Service modules for each backend API (itinerary, expense, navigation, voice)
-
-3. **Stores**
-   - Itinerary store: Manages itinerary state
-   - Expense store: Manages expense tracking state
-
-### Backend Layer (FastAPI)
-
-**Technology Stack:**
-- FastAPI (Python web framework)
-- Pydantic for data validation
-- Uvicorn as ASGI server
-- Supabase Python client
-- HTTPx for async HTTP requests
-
-**Architecture Pattern:** Service-Oriented Architecture
-
-**Core Services:**
-
-1. **Travel Service (Orchestrator)**
-   - Coordinates itinerary generation and expense tracking
-   - Main interface for travel-related operations
-   - Manages relationships between itineraries and expenses
-   - Provides budget status and comparison
-
-2. **LLM Service**
-   - Integrates with Qwen (Alibaba Cloud) or Doubao (ByteDance)
-   - Generates personalized itineraries based on user inputs
-   - Processes travel preferences into detailed day plans
-   - Estimates costs for activities
-
-3. **Expense Service**
-   - CRUD operations for expense records
-   - Category-based expense tracking
-   - Expense summary and analytics
-   - Integration with Supabase database
-
-4. **Navigation Service**
-   - Integrates with Amap (高德地图) API
-   - Location search functionality
-   - Route planning with multiple modes (walking, transit, driving)
-   - Distance and duration calculations
-
-5. **Voice Service**
-   - Integrates with iFlytek API
-   - Speech-to-text conversion
-   - Supports multiple languages (primarily Chinese)
-
-**API Endpoints:**
-
+### API 路由
 ```
-/api/itineraries/
-  - POST   /             Create itinerary
-  - GET    /             List itineraries
-  - GET    /{id}         Get itinerary details
-  - DELETE /{id}         Delete itinerary
-  - GET    /{id}/budget-status   Get budget status
+/api/itineraries
+   ├─ POST /          创建行程
+   ├─ GET /           查询行程列表
+   ├─ GET /{id}       查看详情
+   ├─ DELETE /{id}    删除
+   └─ GET /{id}/budget-status  预算对比
 
-/api/expenses/
-  - POST   /             Create expense
-  - GET    /             List expenses
-  - GET    /summary      Get expense summary
-  - GET    /{id}         Get expense details
-  - PUT    /{id}         Update expense
-  - DELETE /{id}         Delete expense
+/api/expenses
+   ├─ POST /          创建费用
+   ├─ GET /           列表/筛选
+   ├─ GET /summary    汇总
+   ├─ GET /{id}       查看单条
+   ├─ PUT /{id}       更新
+   └─ DELETE /{id}    删除
 
-/api/navigation/
-  - POST   /search       Search locations
-  - POST   /route        Get route information
+/api/navigation
+   ├─ POST /search    地点搜索
+   └─ POST /route     路线规划
 
-/api/voice/
-  - POST   /recognize    Recognize speech
+/api/voice
+   └─ POST /recognize 语音识别
 ```
 
-### Data Layer
+## 5. 数据层
+- **数据库**：Supabase PostgreSQL。
+- **主要表结构**：
+   - `itineraries`：保存行程元数据与每日计划（JSONB）。
+   - `expenses`：费用明细，外键关联行程。
+- **模型要点**：
+   - 使用 UUID 作为主键，便于前后端一致性。
+   - `daily_itinerary` 字段以结构化 JSON 存储 AI 生成的天级计划。
+   - 通过触发器或后端逻辑维护 `updated_at` 字段。
+- **同步策略**：所有写操作通过服务层完成，前端只能调用 REST API，确保权限与数据校验统一。
 
-**Supabase Database Schema:**
+## 6. 外部服务集成
+| 服务        | 作用       | 集成方式                                          |
+| ----------- | ---------- | ------------------------------------------------- |
+| Supabase    | DB / Auth  | `supabase-py` 客户端，使用环境变量配置 URL 与 KEY |
+| 千问 / 豆包 | LLM        | HTTPX 调用 REST API，支持模型切换与超时重试       |
+| 高德地图    | POI / 路线 | REST 接口，需处理返回坐标、路线步骤的解析         |
+| 科大讯飞    | 语音识别   | WebAPI，使用 HMAC 认证并上传 Base64 音频          |
 
-```sql
--- Itineraries Table
-CREATE TABLE itineraries (
-  id UUID PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  destination TEXT NOT NULL,
-  start_date DATE NOT NULL,
-  end_date DATE NOT NULL,
-  budget DECIMAL NOT NULL,
-  daily_itinerary JSONB NOT NULL,
-  total_estimated_cost DECIMAL NOT NULL,
-  recommendations TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Expenses Table
-CREATE TABLE expenses (
-  id UUID PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  itinerary_id UUID REFERENCES itineraries(id),
-  category TEXT NOT NULL,
-  amount DECIMAL NOT NULL,
-  description TEXT NOT NULL,
-  date TIMESTAMP NOT NULL,
-  location TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
+## 7. 数据流说明
+### 行程生成
+```
+前端收集需求 → POST /api/itineraries → TravelService 调用 LLM →
+解析结果并写入 Supabase → 返回行程数据 → 前端更新 Pinia Store。
 ```
 
-### External API Integrations
-
-1. **Supabase**
-   - Purpose: Database and authentication
-   - Used for: Storing itineraries, expenses, user data
-   - Features: Real-time updates, row-level security
-
-2. **Qwen (Alibaba Cloud) / Doubao (ByteDance)**
-   - Purpose: AI-powered itinerary generation
-   - Used for: Natural language processing, trip planning
-   - Features: Context-aware responses, Chinese language support
-
-3. **Amap (高德地图)**
-   - Purpose: Location and navigation services
-   - Used for: Place search, route planning, geocoding
-   - Features: Multiple transport modes, Chinese POI database
-
-4. **iFlytek**
-   - Purpose: Voice recognition
-   - Used for: Speech-to-text conversion
-   - Features: High accuracy for Chinese language, real-time processing
-
-## Data Flow
-
-### Itinerary Generation Flow
-
+### 费用记录
 ```
-1. User fills form in CreateItinerary.vue
-2. Frontend sends POST to /api/itineraries/
-3. Backend receives request at itinerary endpoint
-4. Travel Service coordinates with LLM Service
-5. LLM Service calls Qwen/Doubao API
-6. LLM generates structured itinerary
-7. Travel Service saves to Supabase
-8. Response returned to frontend
-9. User redirected to ItineraryDetail.vue
+前端表单/语音输入 → POST /api/expenses → ExpenseService 校验并存储 →
+返回最新费用 → 前端刷新预算概览与分类统计。
 ```
 
-### Expense Tracking Flow
-
+### 地点导航
 ```
-1. User adds expense in ExpenseTracker.vue
-2. Frontend sends POST to /api/expenses/
-3. Backend validates data with Pydantic schemas
-4. Expense Service saves to Supabase
-5. Frontend updates Expense Store
-6. Summary is recalculated
-7. UI updates to show new expense
+前端触发搜索 → POST /api/navigation/search → 调用高德接口 →
+返回候选地点 → 用户选择后可继续请求路线。
 ```
 
-### Navigation Flow
+## 8. 安全与合规
+- API Key 全部通过 `.env` 注入，禁止硬编码。
+- CORS 默认允许 `http://localhost:5173` 与 `http://localhost:3000`，部署后需按域名调整。
+- JWT 秘钥 `SECRET_KEY` 已生成随机值；若要上线需加入 token 续签、权限控制等逻辑。
+- 推荐在 Supabase 开启 Row Level Security 并配置访问策略。
+- 生产部署需使用 HTTPS，防止语音与行程数据被窃听。
 
-```
-1. User searches location in itinerary form
-2. Frontend calls Navigation Service
-3. Backend queries Amap API
-4. Results parsed and returned
-5. Frontend displays location suggestions
-6. User can request route planning
-7. Backend calculates route via Amap
-8. Step-by-step directions returned
-```
+## 9. 扩展性与性能
+- FastAPI 天然支持异步 I/O，可提高外部 API 调用并发能力。
+- 可在 Service 层加入缓存（Redis 等）以降低重复行程生成的成本。
+- 导航/语音服务可拆分为独立微服务以便水平扩展。
+- 前端使用代码分包与懒加载减少首屏资源体积。
 
-## Security Considerations
+## 10. 部署形态
+- **开发环境**：
+   - 后端：`uvicorn app.main:app --reload --port 8000`
+   - 前端：`npm run dev -- --host`（默认 5173）
+- **容器化**：
+   - `docker-compose.yml` 同时构建前后端镜像，支持热更新。
+- **生产建议**：
+   - 后端：Gunicorn + Uvicorn Worker，前置 Nginx。
+   - 前端：`npm run build` 后由 Nginx/静态托管服务部署。
+   - 环境变量通过 Secret 管理，避免明文写入镜像。
 
-1. **API Keys**: Stored in environment variables, never in code
-2. **CORS**: Configured to allow specific origins only
-3. **Input Validation**: Pydantic schemas validate all inputs
-4. **Authentication**: Mock implementation (ready for JWT)
-5. **HTTPS**: Recommended for production deployment
+## 11. 后续演进方向
+1. 完成 Supabase Auth 接入，与行程、费用数据绑定真实用户。
+2. 引入实时通道（Supabase Realtime / WebSocket）实现多人协同与提醒。
+3. 提供离线缓存、PWA 支持，改善旅行途中的可用性。
+4. 抽象外部 API 调用接口，方便切换地图或语音服务供应商。
+5. 增强监控与日志（Prometheus、OpenTelemetry 等），便于排查大模型调用问题。
 
-## Scalability
-
-1. **Async Operations**: FastAPI async endpoints for concurrent requests
-2. **Caching**: Can be added for frequently accessed itineraries
-3. **Load Balancing**: FastAPI can run multiple workers
-4. **Database**: Supabase provides auto-scaling
-5. **CDN**: Frontend static assets can be served via CDN
-
-## Deployment Architecture
-
-**Development:**
-- Backend: `uvicorn --reload` on port 8000
-- Frontend: `npm run dev` on port 5173
-
-**Production:**
-- Backend: Gunicorn + Uvicorn workers behind nginx
-- Frontend: Built static files served by nginx or CDN
-- Database: Supabase managed service
-- Environment: Docker containers with docker-compose
-
-## Future Enhancements
-
-1. **Authentication**: Full JWT-based auth with Supabase
-2. **Real-time Updates**: WebSocket for live expense tracking
-3. **Offline Support**: PWA with service workers
-4. **Mobile App**: React Native or Flutter
-5. **Social Features**: Share itineraries, collaborative planning
-6. **ML Models**: Personalized recommendations based on history
-7. **Payment Integration**: Direct booking and payment
-8. **Multi-language**: i18n support for international users
+本架构文档与 `PRD.md`、`API.md`、`FEATURES.md` 配合，可指导团队完成课程作业的研发与验收。

@@ -1,348 +1,170 @@
-# AI Travel Planner - Feature Overview
+# AI 旅行规划助手 - 功能说明
 
-## 🎯 Core Features
+## 🎯 核心能力概览
 
-### 1. AI-Powered Itinerary Generation
+### 1. 智能行程规划
+**功能亮点**
+- 结合千问/豆包大模型，根据目的地、日期、预算、偏好等信息生成“日程 + 推荐 + 预算”完整方案。
+- 自动拆分早午晚活动，给出地点、门票/人均费用、出行提示与注意事项。
+- 支持语音或文字输入，生成结果可保存、分享或再次编辑。
 
-**What it does:**
-- Generates personalized day-by-day travel plans using advanced AI (Qwen or Doubao LLM)
-- Creates detailed activity schedules with time slots, locations, and estimated costs
-- Provides smart recommendations based on budget and preferences
+**用户路径**
+1. 语音/文字填写：目的地、出行时间、预算、同行人数、偏好标签、额外备注。
+2. 后端调用 LLM 生成带结构的 `daily_itinerary`。
+3. 前端以时间线渲染，提供预算卡片、地图预览、导出按钮。
 
-**User Journey:**
-1. User fills out trip planning form with:
-   - Destination (e.g., "Beijing", "Paris")
-   - Travel dates (start and end)
-   - Total budget
-   - Preferences (cultural, food, adventure, shopping, etc.)
-   - Additional notes
-2. AI processes the input and generates a complete itinerary
-3. User receives a detailed day-by-day plan with:
-   - Morning, afternoon, and evening activities
-   - Specific locations and attractions
-   - Estimated costs for each activity
-   - Practical tips and recommendations
-
-**Example Output:**
+**示例**
 ```
-Day 1 - March 15, 2024
-09:00 - Visit Forbidden City
-        📍 Forbidden City, Beijing
-        💰 ¥60
-        📝 Book tickets in advance online
-
-12:00 - Lunch at local restaurant
-        📍 Dongcheng District
-        💰 ¥100
-        📝 Try local specialties like Peking duck
-
-14:00 - Explore Tiananmen Square
-        📍 Tiananmen Square
-        💰 Free
-        📝 Bring water and sunscreen
-
-...
+Day 1（2025-02-01）
+09:00 浅草寺参观  0 元  �东京都台东区
+12:00 筑地寿司午餐  ¥200  📝建议提前预约
+14:30 隅田川游船  ¥120  📝可在线购票
 ```
 
 ---
 
-### 2. Smart Expense Tracking
+### 2. 智能费用追踪
+**功能亮点**
+- 费用按“住宿/餐饮/交通/活动/购物/其他”分类，支持语音快速记账。
+- 实时对比计划预算、AI 估算与实际支出，自动计算剩余金额与占比。
+- 提供分类环形图、趋势图、明细表格，支持编辑/删除/筛选。
 
-**What it does:**
-- Tracks all travel expenses by category
-- Provides real-time budget comparison (planned vs actual)
-- Generates visual summaries and breakdowns
-
-**Categories:**
-- 🏨 Accommodation
-- 🍽️ Food & Dining
-- 🚗 Transportation
-- 🎯 Activities & Entertainment
-- 🛍️ Shopping
-- 📝 Other
-
-**Features:**
-- Add/Edit/Delete expenses
-- Filter by category or trip
-- View total spending
-- See category breakdown
-- Compare against budget
-- Track spending percentage
-
-**Dashboard View:**
+**示例面板**
 ```
-Total Expenses: ¥1,500
-Budget Remaining: ¥3,500 (70% remaining)
-
-By Category:
-🍽️ Food: ¥500 (33%)
-🚗 Transportation: ¥300 (20%)
-🏨 Accommodation: ¥600 (40%)
-🎯 Activities: ¥100 (7%)
+总支出：¥1,500   剩余预算：¥3,500（70%）
+🍽️ 餐饮 ¥500  🚗 交通 ¥300  🏨 住宿 ¥600  🎯 活动 ¥100
 ```
 
 ---
 
-### 3. Navigation & Location Services
+### 3. 地图与路线服务
+**功能亮点**
+- 高德地图 POI 搜索：输入景点或餐厅名称即返回坐标与地址。
+- 路线规划支持步行/公交/驾车三种模式，提供里程和预估时间。
+- 行程详情页内联地图预览，标记每日活动地点。
 
-**What it does:**
-- Search for destinations and points of interest
-- Get route planning with multiple transport modes
-- Calculate distance and travel time
-
-**Powered by Amap (高德地图) API:**
-- Accurate Chinese location database
-- Real-time route calculations
-- Support for walking, transit, and driving modes
-
-**Use Cases:**
-- Find attractions and landmarks
-- Plan routes between locations
-- Estimate travel time
-- Get step-by-step directions
-
-**Example:**
+**示例**
 ```
-From: Beijing Railway Station
-To: Forbidden City
-Mode: Transit
-
-Route:
-🚇 Take subway line 2 (15 min)
-🚶 Walk to destination (5 min)
-
-Total Distance: 3.5 km
-Total Time: 25 minutes
+起点：东京站 → 终点：浅草寺（方式：transit）
+步骤：乘坐丸之内线 → 换乘银座线 → 步行 400m 抵达
+距离：5.2 km   时长：28 分钟
 ```
 
 ---
 
-### 4. Voice Recognition
-
-**What it does:**
-- Convert speech to text for hands-free input
-- Support for Chinese and other languages
-- Quick expense entry via voice
-
-**Powered by iFlytek API:**
-- High accuracy for Chinese language
-- Real-time processing
-- Confidence scoring
-
-**Use Cases:**
-- Voice-based expense entry while traveling
-- Hands-free destination search
-- Quick notes and updates
+### 4. 语音交互
+**功能亮点**
+- 集成科大讯飞语音识别，支持实时转写中文语音。
+- 语音输入行程需求、费用记录，识别结果可编辑后提交。
+- 录音面板提供倒计时、波形展示、重试与取消。
 
 ---
 
-### 5. Budget Management
-
-**What it does:**
-- Monitor spending against planned budget
-- Get alerts when approaching budget limits
-- View detailed financial summary
-
-**Metrics Tracked:**
-- Planned Budget (initial allocation)
-- Estimated Cost (from itinerary)
-- Actual Spent (tracked expenses)
-- Remaining Budget
-- Spending Percentage
-
-**Visual Indicators:**
-- ✅ Green: Under budget
-- ⚠️ Yellow: 80%+ of budget used
-- ❌ Red: Over budget
+### 5. 预算管理中枢
+**功能亮点**
+- 汇总“计划预算 / AI 估算 / 实际支出 / 剩余预算 / 使用率”。
+- 预算使用率以颜色提示：绿色（安全）、黄色（>80%）、红色（超支）。
+- 提供跨行程的预算比较与导出功能预留入口。
 
 ---
 
-## 🎨 User Interface
-
-### Home Page
-- Welcome banner with gradient design
-- Feature cards highlighting key capabilities
-- "How It Works" section with 4-step process
-- Call-to-action buttons
-
-### Itinerary Planning
-- Clean, modern form design
-- Interactive preference chips
-- Date pickers for easy selection
-- Real-time validation
-
-### Itinerary Detail View
-- Day-by-day timeline layout
-- Color-coded activities
-- Budget status overview
-- Expandable activity details
-
-### Expense Tracker
-- Grid/List view of expenses
-- Color-coded category icons
-- Quick add/edit functionality
-- Summary statistics cards
+## 🎨 界面设计重点
+- **首页**：顶部横幅 + 功能卡片 + “如何使用”四步流程 + 快速入口按钮。
+- **行程创建页**：多步骤表单、偏好标签、日期选择器、地图联想搜索、语音输入入口。
+- **行程详情页**：纵向时间线展示每日安排，右侧为预算卡片、地图模块、AI 建议；支持展开活动详情。
+- **费用中心**：卡片化统计、环形图、按日列表、语音+按钮录入、筛选器固定在顶部。
+- **语音模态框**：麦克风按钮、波形动画、识别文本回显、再编辑提交。
+- **响应式设计**：移动端采用底部 Tab 导航，列表改为卡片；表格在窄屏时自动折叠为段落。
 
 ---
 
-## 🔌 API Integrations
-
-### Supabase
-**Purpose:** Database and Authentication
-- Store itineraries and expenses
-- User authentication (ready for implementation)
-- Real-time data sync capabilities
-
-### Qwen / Doubao
-**Purpose:** AI-Powered Content Generation
-- Generate travel itineraries
-- Provide personalized recommendations
-- Process natural language requests
-
-### Amap (高德地图)
-**Purpose:** Location and Navigation
-- Search for destinations
-- Route planning
-- Distance calculations
-- Chinese POI database
-
-### iFlytek
-**Purpose:** Voice Recognition
-- Speech-to-text conversion
-- Multi-language support
-- Real-time processing
+## 🔌 外部服务能力概述
+| 服务        | 功能               | 集成说明                                     |
+| ----------- | ------------------ | -------------------------------------------- |
+| Supabase    | 数据库存储 + 认证  | 存储行程、费用、用户信息，支持 RLS           |
+| 千问 / 豆包 | 行程生成、预算估算 | 在 LLM Service 中可配置模型与温度参数        |
+| 高德地图    | POI 查询、路径规划 | 通过 REST API 调用，返回结构化地点信息       |
+| 科大讯飞    | 语音识别           | WebAPI 接口，需提供 APPID、APIKey、APISecret |
 
 ---
 
-## 💡 Smart Features
-
-### 1. Automatic Cost Estimation
-- AI estimates costs for each activity
-- Considers local prices and average spending
-- Helps with budget planning
-
-### 2. Preference-Based Planning
-- Tailors itinerary to user interests
-- Balances different activity types
-- Optimizes for budget constraints
-
-### 3. Daily Budget Allocation
-- Distributes budget across trip days
-- Suggests appropriate activities per budget
-- Prevents overspending on single days
-
-### 4. Practical Recommendations
-- Transportation tips
-- Booking suggestions
-- Cultural notes
-- Safety reminders
+## 💡 智能体验细节
+1. **费用估算**：LLM 根据目的地均价与偏好自动补全活动估算花费。
+2. **偏好驱动**：对输入标签做 Prompt 加权，提升行程匹配度（如亲子、动漫、美食等）。
+3. **预算分摊**：将总预算按天/活动拆分，并在详情页展示剩余额度。
+4. **AI 建议**：生成交通与预约建议、必备物品、注意事项等。
+5. **语音纠错**：识别结果提供信心度，低于阈值时提示用户确认。
 
 ---
 
-## 📱 Responsive Design
-
-Works seamlessly on:
-- 💻 Desktop computers
-- 📱 Tablets
-- 📱 Mobile phones
-
-Features:
-- Fluid layouts
-- Touch-friendly controls
-- Optimized navigation
-- Readable typography
+## 📱 跨平台体验
+- 响应式布局适配桌面、平板与手机；按钮与输入区域至少 48px 便于触控。
+- 暗色模式预留：通过 CSS 变量快速切换主题。
+- 支持 iOS/Android 浏览器录音（需 HTTPS 与用户授权）。
 
 ---
 
-## �� Security & Privacy
-
-- Environment-based configuration
-- API key protection
-- Input validation
-- CORS security
-- Ready for JWT authentication
+## 🔐 安全与隐私
+- 环境变量管理所有外部密钥，默认不提交到仓库。
+- 后端统一校验用户输入，避免 SQL 注入与 XSS。
+- 预留 JWT 认证接口，方便后续实现登录与权限控制。
+- 建议在生产环境开启 HTTPS，并遵循各 API 服务商的数据使用规范。
 
 ---
 
-## 🚀 Performance
-
-- Async API calls for responsiveness
-- Optimistic UI updates
-- Efficient state management
-- Fast page loads with Vite
+## 🚀 性能优化
+- 后端异步调用外部 API，降低高延迟对整体响应的影响。
+- 前端使用懒加载与骨架屏，提升大模型生成过程的用户体验。
+- Pinia Store 减少重复请求；对行程/费用列表增加缓存与乐观更新。
 
 ---
 
-## 📊 Data Visualization
-
-### Budget Overview
+## 📊 数据可视化
+### 预算概览卡片（示例）
 ```
-┌─────────────────────────────────┐
-│   Planned Budget: ¥5,000        │
-│   Estimated Cost: ¥2,500        │
-│   Actual Spent:   ¥1,200        │
-│   Remaining:      ¥3,800 (76%)  │
-└─────────────────────────────────┘
+┌────────────────────────────┐
+│  计划预算：¥10,000          │
+│  AI 估算：¥4,200            │
+│  实际支出：¥1,800           │
+│  剩余预算：¥8,200（82%）    │
+└────────────────────────────┘
 ```
-
-### Expense Breakdown
+### 分类环形图
 ```
-🍽️ ████████████░░░░░░░░ Food: ¥500
-🚗 ████████░░░░░░░░░░░░ Transport: ¥300
-🏨 ████████████████░░░░ Hotel: ¥600
-🎯 ████░░░░░░░░░░░░░░░░ Activities: ¥100
+🍽️ ██████████░░░  餐饮 ¥500
+🚗 ██████░░░░░░░  交通 ¥300
+🏨 ███████████░░  住宿 ¥600
+🎯 ██░░░░░░░░░░░  活动 ¥100
 ```
 
 ---
 
-## 🎯 Use Cases
-
-### Solo Travelers
-- Get personalized itineraries
-- Track individual expenses
-- Find local attractions
-
-### Family Trips
-- Plan activities for all ages
-- Manage shared expenses
-- Track total family budget
-
-### Business Travel
-- Organize work-related trips
-- Categorize business expenses
-- Generate expense reports
-
-### Budget Travelers
-- Find cost-effective activities
-- Monitor spending closely
-- Stay within budget limits
-
-### Luxury Travel
-- Discover premium experiences
-- Track high-value purchases
-- Plan exclusive activities
+## 🎯 典型使用场景
+| 场景       | 需求                       | 功能匹配                |
+| ---------- | -------------------------- | ----------------------- |
+| 单人旅行   | 快速制定行程、预算自控     | 智能行程 + 预算卡片     |
+| 家庭出游   | 多人偏好兼顾、语音操作便利 | 偏好标签 + 语音输入     |
+| 商务差旅   | 临时行程安排、费用报销     | 快速生成行程 + 费用导出 |
+| 学生穷游   | 找高性价比活动、控制支出   | AI 推荐 + 预算提示      |
+| 深度游玩家 | 寻找特色体验、地图辅助     | 地图导航 + 活动建议     |
 
 ---
 
-## 🌟 Why Use AI Travel Planner?
-
-1. **Save Time**: AI generates complete itineraries in seconds
-2. **Stay Organized**: All trip details in one place
-3. **Control Budget**: Real-time expense tracking
-4. **Discover More**: AI suggests hidden gems and local favorites
-5. **Stay Informed**: Get practical tips and recommendations
-6. **Multi-language**: Support for Chinese and international destinations
-7. **Always Available**: Access from any device, anywhere
+## 🌟 使用本产品的理由
+1. **效率高**：语音对话几秒生成完整行程。
+2. **信息全**：交通、住宿、餐饮、活动一站式展示。
+3. **控预算**：实时掌握开销，避免超支。
+4. **好探索**：AI 挖掘隐藏玩法与当地推荐。
+5. **易共享**：计划可保存、复制、后续迭代。
+6. **易扩展**：架构清晰，便于课程或团队继续开发。
 
 ---
 
-## 📈 Future Possibilities
-
-- Social sharing and collaborative planning
-- Integration with booking platforms
-- Mobile app (iOS/Android)
-- Offline mode for travel
-- Photo galleries and trip memories
-- Travel community features
-- Multi-destination trip planning
-- Calendar integration
+## 📈 未来可扩展方向
+- 行程社交分享、多用户协同编辑。
+- 接入酒店/门票预订与支付渠道。
+- 手机 App / PWA，支持离线查看。
+- 行程回顾与游记生成功能。
+- AI 推荐可视化（热度图、兴趣分布）。
+- 多目的地跨城市规划、时间轴合并。
+- 日历同步与提醒服务。

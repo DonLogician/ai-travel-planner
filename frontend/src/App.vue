@@ -2,12 +2,12 @@
   <div id="app">
     <nav class="navbar">
       <div class="container">
-        <router-link to="/" class="nav-brand">🧳 AI Travel Planner</router-link>
+        <router-link to="/" class="nav-brand">🧳 AI 智能旅行助手</router-link>
         <div class="nav-links">
-          <router-link to="/">Home</router-link>
-          <router-link to="/itineraries">My Itineraries</router-link>
-          <router-link to="/itineraries/create">Plan Trip</router-link>
-          <router-link to="/expenses">Expenses</router-link>
+          <router-link to="/">首页</router-link>
+          <router-link to="/itineraries">我的行程</router-link>
+          <router-link to="/itineraries/create">创建行程</router-link>
+          <router-link to="/expenses">旅行账本</router-link>
         </div>
       </div>
     </nav>
@@ -18,7 +18,7 @@
 
     <footer class="footer">
       <div class="container">
-        <p>&copy; 2024 AI Travel Planner. Powered by AI for personalized travel experiences.</p>
+        <p>&copy; 2024 AI 智能旅行助手 · 为你打造个性化旅程体验</p>
       </div>
     </footer>
   </div>

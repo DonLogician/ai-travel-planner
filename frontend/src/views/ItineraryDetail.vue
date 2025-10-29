@@ -29,7 +29,8 @@ const fetchBudgetStatus = async (id) => {
 const itinerary = computed(() => itineraryStore.currentItinerary);
 
 const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString('en-US', {
+  if (!dateString) return '';
+  return new Date(dateString).toLocaleDateString('zh-CN', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -45,7 +46,7 @@ const formatTime = (timeString) => {
 <template>
   <div class="container">
     <div v-if="itineraryStore.loading" class="loading">
-      <p>Loading itinerary...</p>
+      <p>行程加载中...</p>
     </div>
 
     <div v-else-if="itinerary" class="itinerary-detail">
@@ -53,29 +54,30 @@ const formatTime = (timeString) => {
         <div>
           <h1>{{ itinerary.destination }}</h1>
           <p class="dates">
-            {{ formatDate(itinerary.start_date) }} - {{ formatDate(itinerary.end_date) }}
+            {{ formatDate(itinerary.start_date) || '日期待定' }} -
+            {{ formatDate(itinerary.end_date) || '日期待定' }}
           </p>
         </div>
-        <router-link to="/itineraries" class="btn btn-secondary">Back to List</router-link>
+        <router-link to="/itineraries" class="btn btn-secondary">返回列表</router-link>
       </div>
 
       <div class="budget-overview card">
-        <h2>Budget Overview</h2>
+        <h2>预算总览</h2>
         <div class="budget-stats">
           <div class="stat">
-            <span class="label">Planned Budget</span>
+            <span class="label">计划预算</span>
             <span class="value">¥{{ itinerary.budget?.toLocaleString() }}</span>
           </div>
           <div class="stat">
-            <span class="label">Estimated Cost</span>
+            <span class="label">预估花费</span>
             <span class="value">¥{{ itinerary.total_estimated_cost?.toLocaleString() }}</span>
           </div>
           <div v-if="budgetStatus" class="stat">
-            <span class="label">Actual Spent</span>
+            <span class="label">实际支出</span>
             <span class="value">¥{{ budgetStatus.actual_spent?.toLocaleString() }}</span>
           </div>
           <div v-if="budgetStatus" class="stat">
-            <span class="label">Remaining</span>
+            <span class="label">剩余预算</span>
             <span class="value" :class="{ negative: budgetStatus.remaining < 0 }">
               ¥{{ budgetStatus.remaining?.toLocaleString() }}
             </span>
@@ -84,19 +86,19 @@ const formatTime = (timeString) => {
       </div>
 
       <div class="recommendations card" v-if="itinerary.recommendations">
-        <h2>💡 Recommendations</h2>
+        <h2>💡 行程建议</h2>
         <p>{{ itinerary.recommendations }}</p>
       </div>
 
       <div class="daily-itinerary">
-        <h2>Daily Itinerary</h2>
+        <h2>每日安排</h2>
         <div
           v-for="day in itinerary.daily_itinerary"
           :key="day.day"
           class="day-card card"
         >
           <div class="day-header">
-            <h3>Day {{ day.day }} - {{ formatDate(day.date) }}</h3>
+            <h3>第 {{ day.day }} 天 · {{ formatDate(day.date) || '日期待定' }}</h3>
             <span class="day-cost">¥{{ day.total_estimated_cost?.toLocaleString() }}</span>
           </div>
 
@@ -122,8 +124,8 @@ const formatTime = (timeString) => {
     </div>
 
     <div v-else class="error">
-      <p>Itinerary not found</p>
-      <router-link to="/itineraries" class="btn btn-primary">Go to Itineraries</router-link>
+      <p>未找到行程</p>
+      <router-link to="/itineraries" class="btn btn-primary">返回行程列表</router-link>
     </div>
   </div>
 </template>

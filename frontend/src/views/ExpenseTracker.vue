@@ -16,12 +16,12 @@ const form = ref({
 });
 
 const categories = [
-  { value: 'accommodation', label: '🏨 Accommodation', color: '#e74c3c' },
-  { value: 'food', label: '🍽️ Food', color: '#f39c12' },
-  { value: 'transportation', label: '🚗 Transportation', color: '#3498db' },
-  { value: 'activities', label: '🎯 Activities', color: '#9b59b6' },
-  { value: 'shopping', label: '🛍️ Shopping', color: '#1abc9c' },
-  { value: 'other', label: '📝 Other', color: '#95a5a6' },
+  { value: 'accommodation', label: '🏨 住宿', color: '#e74c3c' },
+  { value: 'food', label: '🍽️ 餐饮', color: '#f39c12' },
+  { value: 'transportation', label: '🚗 交通', color: '#3498db' },
+  { value: 'activities', label: '🎯 活动体验', color: '#9b59b6' },
+  { value: 'shopping', label: '🛍️ 购物', color: '#1abc9c' },
+  { value: 'other', label: '📝 其他', color: '#95a5a6' },
 ];
 
 onMounted(() => {
@@ -51,7 +51,7 @@ const handleSubmit = async () => {
     await expenseStore.fetchExpenseSummary();
     resetForm();
   } catch (error) {
-    alert('Failed to save expense');
+    alert('保存支出失败，请稍后重试');
   }
 };
 
@@ -68,12 +68,12 @@ const handleEdit = (expense) => {
 };
 
 const handleDelete = async (id) => {
-  if (confirm('Are you sure you want to delete this expense?')) {
+  if (confirm('确定要删除这条支出记录吗？')) {
     try {
       await expenseStore.deleteExpense(id);
       await expenseStore.fetchExpenseSummary();
     } catch (error) {
-      alert('Failed to delete expense');
+      alert('删除支出失败，请稍后重试');
     }
   }
 };
@@ -83,10 +83,11 @@ const getCategoryInfo = (categoryValue) => {
 };
 
 const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString('en-US', {
+  if (!dateString) return '';
+  return new Date(dateString).toLocaleDateString('zh-CN', {
     year: 'numeric',
-    month: 'short',
-    day: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   });
 };
 </script>
@@ -95,19 +96,19 @@ const formatDate = (dateString) => {
   <div class="container">
     <div class="expense-tracker">
       <div class="header">
-        <h1>Expense Tracker</h1>
+        <h1>旅行账本</h1>
         <button @click="showAddForm = !showAddForm" class="btn btn-primary">
-          {{ showAddForm ? 'Cancel' : '+ Add Expense' }}
+          {{ showAddForm ? '取消' : '+ 新增支出' }}
         </button>
       </div>
 
       <!-- Add/Edit Form -->
       <div v-if="showAddForm" class="card expense-form">
-        <h2>{{ editingExpense ? 'Edit Expense' : 'Add New Expense' }}</h2>
+        <h2>{{ editingExpense ? '编辑支出' : '新增支出' }}</h2>
         <form @submit.prevent="handleSubmit">
           <div class="form-row">
             <div class="form-group">
-              <label for="category">Category</label>
+              <label for="category">支出分类</label>
               <select id="category" v-model="form.category" required>
                 <option v-for="cat in categories" :key="cat.value" :value="cat.value">
                   {{ cat.label }}
@@ -116,7 +117,7 @@ const formatDate = (dateString) => {
             </div>
 
             <div class="form-group">
-              <label for="amount">Amount (¥)</label>
+              <label for="amount">金额 (¥)</label>
               <input
                 id="amount"
                 v-model.number="form.amount"
@@ -129,45 +130,45 @@ const formatDate = (dateString) => {
           </div>
 
           <div class="form-group">
-            <label for="description">Description</label>
+            <label for="description">支出描述</label>
             <input
               id="description"
               v-model="form.description"
               type="text"
-              placeholder="e.g., Dinner at local restaurant"
+              placeholder="例如：本地餐厅晚餐"
               required
             />
           </div>
 
           <div class="form-group">
-            <label for="location">Location (Optional)</label>
-            <input id="location" v-model="form.location" type="text" placeholder="e.g., Beijing" />
+            <label for="location">地点（可选）</label>
+            <input id="location" v-model="form.location" type="text" placeholder="例如：北京" />
           </div>
 
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">
-              {{ editingExpense ? 'Update' : 'Add' }} Expense
+              {{ editingExpense ? '更新' : '新增' }}支出
             </button>
-            <button type="button" @click="resetForm" class="btn btn-secondary">Cancel</button>
+            <button type="button" @click="resetForm" class="btn btn-secondary">取消</button>
           </div>
         </form>
       </div>
 
       <!-- Summary -->
       <div v-if="expenseStore.summary" class="summary card">
-        <h2>Summary</h2>
+        <h2>支出总览</h2>
         <div class="summary-stats">
           <div class="stat-large">
-            <span class="label">Total Expenses</span>
+            <span class="label">累计支出</span>
             <span class="value">¥{{ expenseStore.summary.total_expenses?.toLocaleString() }}</span>
           </div>
           <div class="stat-large">
-            <span class="label">Total Transactions</span>
+            <span class="label">记录笔数</span>
             <span class="value">{{ expenseStore.summary.count }}</span>
           </div>
         </div>
 
-        <h3>By Category</h3>
+        <h3>分类汇总</h3>
         <div class="category-breakdown">
           <div
             v-for="(amount, category) in expenseStore.summary.by_category"
@@ -182,11 +183,11 @@ const formatDate = (dateString) => {
 
       <!-- Expense List -->
       <div class="expense-list">
-        <h2>Recent Expenses</h2>
-        <div v-if="expenseStore.loading" class="loading">Loading expenses...</div>
+        <h2>最新支出</h2>
+        <div v-if="expenseStore.loading" class="loading">支出加载中...</div>
 
         <div v-else-if="expenseStore.expenses.length === 0" class="empty-state">
-          <p>No expenses recorded yet. Start tracking your spending!</p>
+          <p>暂无支出记录，快来记录第一笔消费吧！</p>
         </div>
 
         <div v-else class="expense-items">
@@ -210,8 +211,8 @@ const formatDate = (dateString) => {
               <div class="expense-amount">¥{{ expense.amount?.toLocaleString() }}</div>
             </div>
             <div class="expense-actions">
-              <button @click="handleEdit(expense)" class="btn btn-secondary btn-sm">Edit</button>
-              <button @click="handleDelete(expense.id)" class="btn btn-danger btn-sm">Delete</button>
+              <button @click="handleEdit(expense)" class="btn btn-secondary btn-sm">编辑</button>
+              <button @click="handleDelete(expense.id)" class="btn btn-danger btn-sm">删除</button>
             </div>
           </div>
         </div>

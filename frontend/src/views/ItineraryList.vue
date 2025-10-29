@@ -11,20 +11,21 @@ onMounted(() => {
 });
 
 const deleteItinerary = async (id) => {
-  if (confirm('Are you sure you want to delete this itinerary?')) {
+  if (confirm('确定要删除此行程吗？')) {
     try {
       await itineraryStore.deleteItinerary(id);
     } catch (error) {
-      alert('Failed to delete itinerary');
+      alert('删除行程失败，请稍后重试');
     }
   }
 };
 
 const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString('en-US', {
+  if (!dateString) return '日期待定';
+  return new Date(dateString).toLocaleDateString('zh-CN', {
     year: 'numeric',
-    month: 'short',
-    day: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   });
 };
 </script>
@@ -33,14 +34,14 @@ const formatDate = (dateString) => {
   <div class="container">
     <div class="itinerary-list">
       <div class="header">
-        <h1>My Itineraries</h1>
+        <h1>我的旅行行程</h1>
         <router-link to="/itineraries/create" class="btn btn-primary">
-          + New Itinerary
+          + 新建行程
         </router-link>
       </div>
 
       <div v-if="itineraryStore.loading" class="loading">
-        <p>Loading itineraries...</p>
+        <p>行程加载中...</p>
       </div>
 
       <div v-else-if="itineraryStore.error" class="error">
@@ -48,9 +49,9 @@ const formatDate = (dateString) => {
       </div>
 
       <div v-else-if="itineraryStore.itineraries.length === 0" class="empty-state">
-        <p>You haven't created any itineraries yet.</p>
+        <p>你还没有创建任何行程。</p>
         <router-link to="/itineraries/create" class="btn btn-primary">
-          Create Your First Itinerary
+          立即创建第一个行程
         </router-link>
       </div>
 
@@ -63,7 +64,7 @@ const formatDate = (dateString) => {
           <div class="card-header">
             <h3>{{ itinerary.destination }}</h3>
             <span class="badge">
-              {{ itinerary.daily_itinerary?.length || 0 }} days
+              共 {{ itinerary.daily_itinerary?.length || 0 }} 天
             </span>
           </div>
 
@@ -74,11 +75,11 @@ const formatDate = (dateString) => {
             </p>
             <p class="budget">
               <strong>💰</strong>
-              Budget: ¥{{ itinerary.budget?.toLocaleString() }}
+              预算：¥{{ itinerary.budget?.toLocaleString() }}
             </p>
             <p class="estimated-cost">
               <strong>💵</strong>
-              Estimated: ¥{{ itinerary.total_estimated_cost?.toLocaleString() }}
+              预估花费：¥{{ itinerary.total_estimated_cost?.toLocaleString() }}
             </p>
           </div>
 
@@ -87,10 +88,10 @@ const formatDate = (dateString) => {
               @click="router.push(`/itineraries/${itinerary.id}`)"
               class="btn btn-primary btn-sm"
             >
-              View Details
+              查看详情
             </button>
             <button @click="deleteItinerary(itinerary.id)" class="btn btn-danger btn-sm">
-              Delete
+              删除
             </button>
           </div>
         </div>

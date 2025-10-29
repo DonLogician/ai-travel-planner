@@ -16,13 +16,13 @@ const form = ref({
 });
 
 const preferenceOptions = [
-  { value: 'cultural', label: 'Cultural' },
-  { value: 'adventure', label: 'Adventure' },
-  { value: 'relaxation', label: 'Relaxation' },
-  { value: 'food', label: 'Food' },
-  { value: 'shopping', label: 'Shopping' },
-  { value: 'nature', label: 'Nature' },
-  { value: 'nightlife', label: 'Nightlife' },
+  { value: 'cultural', label: '文化探索' },
+  { value: 'adventure', label: '冒险体验' },
+  { value: 'relaxation', label: '轻松休闲' },
+  { value: 'food', label: '特色美食' },
+  { value: 'shopping', label: '购物血拼' },
+  { value: 'nature', label: '自然风光' },
+  { value: 'nightlife', label: '夜生活' },
 ];
 
 const loading = ref(false);
@@ -45,7 +45,7 @@ const handleSubmit = async () => {
     const itinerary = await itineraryStore.createItinerary(form.value);
     router.push(`/itineraries/${itinerary.id || 'new'}`);
   } catch (err) {
-    error.value = err.message || 'Failed to create itinerary. Please try again.';
+  error.value = err.message || '创建行程失败，请稍后重试。';
   } finally {
     loading.value = false;
   }
@@ -55,52 +55,52 @@ const handleSubmit = async () => {
 <template>
   <div class="container">
     <div class="create-itinerary">
-      <h1>Plan Your Trip</h1>
+      <h1>创建专属行程</h1>
       <p class="subtitle">
-        Tell us about your travel plans and our AI will create a personalized itinerary for you
+        填写旅行需求，AI 会为你生成个性化的每日行程与预算建议
       </p>
 
       <div v-if="error" class="error">{{ error }}</div>
 
       <form @submit.prevent="handleSubmit" class="card">
         <div class="form-group">
-          <label for="destination">Destination *</label>
+          <label for="destination">目的地 *</label>
           <input
             id="destination"
             v-model="form.destination"
             type="text"
-            placeholder="e.g., Beijing, Paris, Tokyo"
+            placeholder="例如：北京、巴黎、东京"
             required
           />
         </div>
 
         <div class="form-row">
           <div class="form-group">
-            <label for="start_date">Start Date *</label>
+            <label for="start_date">出发日期 *</label>
             <input id="start_date" v-model="form.start_date" type="date" required />
           </div>
 
           <div class="form-group">
-            <label for="end_date">End Date *</label>
+            <label for="end_date">返回日期 *</label>
             <input id="end_date" v-model="form.end_date" type="date" required />
           </div>
         </div>
 
         <div class="form-group">
-          <label for="budget">Budget (¥) *</label>
+          <label for="budget">预算 (¥) *</label>
           <input
             id="budget"
             v-model.number="form.budget"
             type="number"
             min="0"
             step="0.01"
-            placeholder="e.g., 5000"
+            placeholder="例如：5000"
             required
           />
         </div>
 
         <div class="form-group">
-          <label>Travel Preferences</label>
+          <label>旅行偏好</label>
           <div class="preference-chips">
             <button
               v-for="option in preferenceOptions"
@@ -116,19 +116,19 @@ const handleSubmit = async () => {
         </div>
 
         <div class="form-group">
-          <label for="additional_notes">Additional Notes</label>
+          <label for="additional_notes">补充说明</label>
           <textarea
             id="additional_notes"
             v-model="form.additional_notes"
-            placeholder="Any special requirements or preferences..."
+            placeholder="如有特殊需求或更多偏好，请在此补充..."
           ></textarea>
         </div>
 
         <div class="form-actions">
           <button type="submit" class="btn btn-primary" :disabled="loading">
-            {{ loading ? 'Generating Itinerary...' : 'Generate Itinerary' }}
+            {{ loading ? '正在生成行程...' : '生成行程' }}
           </button>
-          <router-link to="/itineraries" class="btn btn-secondary">Cancel</router-link>
+          <router-link to="/itineraries" class="btn btn-secondary">取消</router-link>
         </div>
       </form>
     </div>

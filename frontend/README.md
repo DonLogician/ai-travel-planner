@@ -1,5 +1,24 @@
-# Vue 3 + Vite
+# AI Travel Planner 前端
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+## 环境准备
+- Node.js 18+
+- npm 9+
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+复制 `.env.example` 为 `.env`，并配置实际的后端地址、地图与语音相关密钥：
+
+```bash
+cp .env.example .env
+```
+
+## 常用脚本
+- 开发服务器：`npm run dev`
+- 生产构建：`npm run build`
+- 预览构建：`npm run preview`
+
+## 技术栈概览
+- Vue 3 + Vite
+- Vue Router 4
+- Pinia 3
+- Axios
+
+项目结构与组件说明参见 `FRONTEND_DESIGN.md`。

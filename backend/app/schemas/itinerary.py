@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import date, datetime
+from datetime import date as DateType, datetime
 from enum import Enum
 
 
@@ -22,8 +22,8 @@ class ItineraryRequest(BaseModel):
     """Request model for itinerary generation."""
 
     destination: str = Field(..., description="Destination city or location")
-    start_date: date = Field(..., description="Trip start date")
-    end_date: date = Field(..., description="Trip end date")
+    start_date: DateType = Field(..., description="Trip start date")
+    end_date: DateType = Field(..., description="Trip end date")
     budget: float = Field(..., gt=0, description="Total budget for the trip")
     preferences: List[PreferenceType] = Field(
         default=[], description="Travel preferences"
@@ -59,7 +59,7 @@ class DayItinerary(BaseModel):
     """Itinerary for a single day."""
 
     day: int = Field(..., description="Day number")
-    date: date = Field(..., description="Date")
+    date: DateType = Field(..., description="Date")
     activities: List[ActivityItem] = Field(..., description="List of activities")
     total_estimated_cost: float = Field(
         0.0, description="Total estimated cost for the day"
@@ -71,8 +71,8 @@ class ItineraryResponse(BaseModel):
 
     id: Optional[str] = Field(None, description="Itinerary ID")
     destination: str
-    start_date: date
-    end_date: date
+    start_date: DateType
+    end_date: DateType
     budget: float
     daily_itinerary: List[DayItinerary] = Field(..., description="Day-by-day itinerary")
     total_estimated_cost: float = Field(..., description="Total estimated cost")
@@ -113,7 +113,9 @@ class ItineraryTextRequest(BaseModel):
 
     text: str = Field(..., min_length=5, description="Raw user description of the trip")
     language: str = Field(default="zh", description="Language code of the description")
-    start_date: Optional[date] = Field(None, description="Optional explicit start date")
+    start_date: Optional[DateType] = Field(
+        None, description="Optional explicit start date"
+    )
     duration_days: Optional[int] = Field(
         None, description="Optional explicit duration in days"
     )

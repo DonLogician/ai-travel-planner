@@ -80,7 +80,9 @@ Please provide a day-by-day itinerary in JSON format with the following structur
     "recommendations": "General tips and recommendations for the trip"
 }}
 
-Ensure activities are realistic, costs are reasonable, and the itinerary fits within the budget. Reply in Chinese."""
+Ensure activities are realistic, costs are reasonable, and the itinerary fits within the budget.
+请用中文给出回答。
+"""
 
         return prompt
 

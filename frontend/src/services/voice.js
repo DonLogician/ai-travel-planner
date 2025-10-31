@@ -9,4 +9,19 @@ export const voiceService = {
     });
     return response.data;
   },
+
+  // Upload recorded audio file for transcription
+  async uploadVoice(file, language = 'zh_cn') {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('language', language);
+
+    const response = await apiClient.post('/voice/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data;
+  },
 };

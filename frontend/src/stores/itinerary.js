@@ -39,6 +39,24 @@ export const useItineraryStore = defineStore('itinerary', {
       }
     },
 
+    async createItineraryFromText(data) {
+      this.loading = true;
+      this.error = null;
+      try {
+        const result = await itineraryService.createItineraryFromText(data);
+        if (result?.itinerary) {
+          this.itineraries.unshift(result.itinerary);
+        }
+        return result;
+      } catch (error) {
+        this.error = error.message;
+        console.error('Error creating itinerary from text:', error);
+        throw error;
+      } finally {
+        this.loading = false;
+      }
+    },
+
     async fetchItinerary(id) {
       this.loading = true;
       this.error = null;

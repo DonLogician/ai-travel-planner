@@ -7,6 +7,12 @@ export const itineraryService = {
     return response.data;
   },
 
+  // Create itinerary from natural language text
+  async createItineraryFromText(data) {
+    const response = await apiClient.post('/itineraries/from-text', data);
+    return response.data;
+  },
+
   // Get all itineraries
   async getItineraries(limit = 20) {
     const response = await apiClient.get('/itineraries/', { params: { limit } });

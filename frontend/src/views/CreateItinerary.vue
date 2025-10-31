@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useItineraryStore } from '../stores/itinerary';
+import VoiceRecorder from '../components/VoiceRecorder.vue';
 
 const router = useRouter();
 const itineraryStore = useItineraryStore();
@@ -27,6 +28,9 @@ const preferenceOptions = [
 
 const loading = ref(false);
 const error = ref(null);
+const aiLoading = ref(false);
+const aiError = ref(null);
+const aiResult = ref(null);
 
 const togglePreference = (value) => {
   const index = form.value.preferences.indexOf(value);
@@ -45,10 +49,55 @@ const handleSubmit = async () => {
     const itinerary = await itineraryStore.createItinerary(form.value);
     router.push(`/itineraries/${itinerary.id || 'new'}`);
   } catch (err) {
-  error.value = err.message || '创建行程失败，请稍后重试。';
+    error.value = err?.response?.data?.detail || err.message || '创建行程失败，请稍后重试。';
   } finally {
     loading.value = false;
   }
+};
+
+const handleVoiceSubmit = async (text) => {
+  if (!text) {
+    return;
+  }
+
+  aiLoading.value = true;
+  aiError.value = null;
+
+  try {
+    const result = await itineraryStore.createItineraryFromText({
+      text,
+      language: 'zh',
+    });
+    aiResult.value = result;
+  } catch (err) {
+    aiError.value = err?.response?.data?.detail || err.message || '生成行程失败，请稍后重试。';
+  } finally {
+    aiLoading.value = false;
+  }
+};
+
+const clearAiResult = () => {
+  aiResult.value = null;
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return '日期待定';
+  return new Date(dateString).toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+const formatCurrency = (value) => {
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return '—';
+  }
+  return numeric.toLocaleString('zh-CN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
 };
 </script>
 
@@ -57,12 +106,102 @@ const handleSubmit = async () => {
     <div class="create-itinerary">
       <h1>创建专属行程</h1>
       <p class="subtitle">
-        填写旅行需求，AI 会为你生成个性化的每日行程与预算建议
+        填写旅行需求或直接语音描述，AI 会为你生成个性化的每日行程与预算建议
       </p>
+
+      <section class="ai-section card">
+        <div class="section-header">
+          <div>
+            <h2>语音 / 文本快速创建</h2>
+            <p>按下录音或直接输入文字，让 AI 帮你一键生成行程计划。</p>
+          </div>
+        </div>
+
+        <VoiceRecorder :disabled="aiLoading" @submit-text="handleVoiceSubmit" />
+
+        <p v-if="aiError" class="error">{{ aiError }}</p>
+        <p v-if="aiLoading" class="loading">AI 正在生成行程，请稍候...</p>
+
+        <div v-if="aiResult?.itinerary" class="ai-result">
+          <div class="ai-result__header">
+            <div>
+              <h3>{{ aiResult.itinerary.destination }}</h3>
+              <p class="ai-result__dates">
+                {{ formatDate(aiResult.itinerary.start_date) }} -
+                {{ formatDate(aiResult.itinerary.end_date) }}
+              </p>
+            </div>
+            <div class="ai-result__budget">
+              <p>计划预算</p>
+              <strong>¥{{ formatCurrency(aiResult.itinerary.budget) }}</strong>
+            </div>
+          </div>
+
+          <div class="ai-result__summary">
+            <div>
+              <span>预估花费</span>
+              <strong>¥{{ formatCurrency(aiResult.itinerary.total_estimated_cost) }}</strong>
+            </div>
+            <div>
+              <span>行程天数</span>
+              <strong>{{ aiResult.itinerary.daily_itinerary?.length || 0 }} 天</strong>
+            </div>
+          </div>
+
+          <div v-if="aiResult.itinerary.recommendations" class="ai-result__recommendations">
+            <h4>行程建议</h4>
+            <p>{{ aiResult.itinerary.recommendations }}</p>
+          </div>
+
+          <div class="ai-result__days">
+            <div
+              v-for="day in aiResult.itinerary.daily_itinerary"
+              :key="day.day"
+              class="ai-result__day"
+            >
+              <div class="ai-result__day-header">
+                <h4>第 {{ day.day }} 天 · {{ formatDate(day.date) }}</h4>
+                <span>预计 ¥{{ formatCurrency(day.total_estimated_cost) }}</span>
+              </div>
+              <ul class="ai-result__activities">
+                <li v-for="(activity, index) in day.activities" :key="index">
+                  <span class="time">{{ activity.time || '时间待定' }}</span>
+                  <div class="content">
+                    <p class="title">{{ activity.activity }}</p>
+                    <p class="meta">📍 {{ activity.location }}</p>
+                    <p v-if="activity.notes" class="notes">{{ activity.notes }}</p>
+                    <p v-if="activity.estimated_cost" class="cost">
+                      约 ¥{{ formatCurrency(activity.estimated_cost) }}
+                    </p>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <details v-if="aiResult.prompt" class="ai-result__prompt">
+            <summary>查看生成 Prompt</summary>
+            <pre>{{ aiResult.prompt }}</pre>
+          </details>
+
+          <div class="ai-result__actions">
+            <router-link
+              v-if="aiResult.itinerary.id"
+              class="btn btn-primary"
+              :to="`/itineraries/${aiResult.itinerary.id}`"
+            >
+              查看完整行程
+            </router-link>
+            <button type="button" class="btn btn-secondary" @click="clearAiResult">
+              清除结果
+            </button>
+          </div>
+        </div>
+      </section>
 
       <div v-if="error" class="error">{{ error }}</div>
 
-      <form @submit.prevent="handleSubmit" class="card">
+      <form @submit.prevent="handleSubmit" class="card manual-form">
         <div class="form-group">
           <label for="destination">目的地 *</label>
           <input
@@ -137,8 +276,11 @@ const handleSubmit = async () => {
 
 <style scoped>
 .create-itinerary {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
 }
 
 .create-itinerary h1 {
@@ -148,6 +290,201 @@ const handleSubmit = async () => {
 
 .subtitle {
   color: #6c757d;
+  margin-bottom: 0;
+}
+
+.ai-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.section-header h2 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.section-header p {
+  margin: 0.5rem 0 0;
+  color: #6c757d;
+}
+
+.loading {
+  color: #4c51bf;
+  font-weight: 600;
+}
+
+.ai-result {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  background: #f9fafc;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.ai-result__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.ai-result__header h3 {
+  margin: 0;
+  color: #4c51bf;
+}
+
+.ai-result__dates {
+  margin: 0.35rem 0 0;
+  color: #6c757d;
+}
+
+.ai-result__budget {
+  text-align: right;
+  color: #2c3e50;
+}
+
+.ai-result__budget strong {
+  display: block;
+  font-size: 1.5rem;
+}
+
+.ai-result__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.ai-result__summary span {
+  color: #6c757d;
+}
+
+.ai-result__summary strong {
+  font-size: 1.2rem;
+  color: #2c3e50;
+}
+
+.ai-result__recommendations {
+  background: white;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  border-left: 4px solid #667eea;
+}
+
+.ai-result__recommendations h4 {
+  margin: 0 0 0.5rem;
+  color: #2c3e50;
+}
+
+.ai-result__days {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ai-result__day {
+  background: white;
+  border-radius: 10px;
+  padding: 1rem;
+  border: 1px solid rgba(102, 126, 234, 0.15);
+}
+
+.ai-result__day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  color: #2c3e50;
+}
+
+.ai-result__day-header span {
+  color: #4c51bf;
+  font-weight: 600;
+}
+
+.ai-result__activities {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ai-result__activities li {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.ai-result__activities .time {
+  font-weight: 600;
+  color: #4c51bf;
+}
+
+.ai-result__activities .content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ai-result__activities .title {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.ai-result__activities .meta {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.ai-result__activities .notes {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.ai-result__activities .cost {
+  margin: 0;
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.ai-result__prompt {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px dashed rgba(102, 126, 234, 0.4);
+}
+
+.ai-result__prompt summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #4c51bf;
+}
+
+.ai-result__prompt pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  color: #1f2937;
+  background: #f8fafc;
+  padding: 0.75rem;
+  border-radius: 6px;
+}
+
+.ai-result__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.manual-form {
   margin-bottom: 2rem;
 }
 
@@ -155,6 +492,13 @@ const handleSubmit = async () => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
+}
+
+.error {
+  color: #e53e3e;
+  background: rgba(229, 62, 62, 0.08);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
 }
 
 .preference-chips {

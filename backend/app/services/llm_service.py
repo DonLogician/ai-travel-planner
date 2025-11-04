@@ -1,5 +1,10 @@
+import json
+import re
 from typing import Optional, List
 from datetime import timedelta
+
+import httpx
+from pydantic import ValidationError
 from app.schemas.itinerary import (
     ItineraryRequest,
     ItineraryResponse,
@@ -43,7 +48,9 @@ class LLMService:
 
         return itinerary_data
 
-    def create_itinerary_prompt(self, request: ItineraryRequest) -> str:
+    def create_itinerary_prompt(
+        self, request: ItineraryRequest, user_description: Optional[str] = None
+    ) -> str:
         """Create detailed prompt for LLM itinerary generation."""
         num_days = (request.end_date - request.start_date).days + 1
         preferences_str = (
@@ -52,17 +59,21 @@ class LLMService:
             else "general sightseeing"
         )
 
-        prompt = f"""Create a detailed {num_days}-day travel itinerary for {request.destination}.
+        prompt = f"""
+You are a professional travel planner. Create a detailed travel itinerary according to the user's requirements.
+        
+User's requirements :{user_description.strip() if user_description else 'None'}
 
-Trip Details:
-- Destination: {request.destination}
-- Duration: {request.start_date} to {request.end_date} ({num_days} days)
-- Total Budget: ¥{request.budget}
-- Preferences: {preferences_str}
-{f'- Additional Notes: {request.additional_notes}' if request.additional_notes else ''}
+Make sure to analyze the user's requirements(which is given above) carefully, and create an itinerary that fits within the specified time, budget and duration.
+
+Make sure to include transportation and accommodation costs explicitly when estimating daily and total budgets.
+
+Make sure each day includes at least lunch and dinner.
 
 Please provide a day-by-day itinerary in JSON format with the following structure:
 {{
+    "destination": "北京",
+    "budget": 7000,
     "daily_itinerary": [
         {{
             "day": 1,
@@ -81,6 +92,7 @@ Please provide a day-by-day itinerary in JSON format with the following structur
 }}
 
 Ensure activities are realistic, costs are reasonable, and the itinerary fits within the budget.
+Respond with valid JSON only, do not include markdown fences or extra commentary.
 请用中文给出回答。
 """
 
@@ -90,26 +102,58 @@ Ensure activities are realistic, costs are reasonable, and the itinerary fits wi
         self, prompt: str, request: ItineraryRequest
     ) -> ItineraryResponse:
         """Generate itinerary using Qwen (Alibaba Cloud) API."""
-        # In a real implementation, this would call the Qwen API
-        # For now, return a structured fallback response
-        import httpx
-
-        # Qwen API endpoint (example - adjust based on actual API)
-        # This is a placeholder - actual implementation would need proper Qwen SDK
-        try:
-            async with httpx.AsyncClient() as client:
-                # Placeholder for Qwen API call
-                # response = await client.post(
-                #     "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation",
-                #     headers={"Authorization": f"Bearer {settings.QWEN_API_KEY}"},
-                #     json={"model": settings.QWEN_MODEL, "input": {"prompt": prompt}}
-                # )
-                pass
-        except Exception as e:
-            print(f"Error calling Qwen API: {e}")
-
-        # Fallback to structured generation
         num_days = (request.end_date - request.start_date).days + 1
+
+        if not settings.QWEN_API_KEY:
+            print("Qwen API key not configured, using fallback itinerary.")
+            return self._generate_fallback_itinerary(request, num_days)
+
+        endpoint = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
+        headers = {
+            "Authorization": f"Bearer {settings.QWEN_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": settings.QWEN_MODEL or "qwen-turbo",
+            "input": {
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are a helpful travel planner that outputs valid JSON only.",
+                    },
+                    {"role": "user", "content": prompt},
+                ]
+            },
+            "parameters": {
+                "result_format": "json",
+            },
+        }
+
+        raw_content: Optional[str] = None
+        try:
+            async with httpx.AsyncClient(timeout=40.0) as client:
+                response = await client.post(endpoint, headers=headers, json=payload)
+                response.raise_for_status()
+                result = response.json()
+
+                raw_content = (
+                    result.get("output", {}).get("text")
+                    or result.get("output", {})
+                    .get("choices", [{}])[0]
+                    .get("message", {})
+                    .get("content")
+                    or result.get("choices", [{}])[0].get("message", {}).get("content")
+                )
+        except httpx.HTTPError as exc:
+            print(f"Error calling Qwen API: {exc}")
+        except Exception as exc:  # pragma: no cover - defensive guard
+            print(f"Unexpected error calling Qwen API: {exc}")
+
+        itinerary = self._parse_llm_itinerary_response(raw_content, request)
+        if itinerary:
+            return itinerary
+
+        print("Falling back to template itinerary due to invalid LLM response.")
         return self._generate_fallback_itinerary(request, num_days)
 
     async def _generate_with_doubao(
@@ -229,6 +273,146 @@ Ensure activities are realistic, costs are reasonable, and the itinerary fits wi
             recs.append("Many museums offer free admission on certain days.")
 
         return " ".join(recs)
+
+    def _parse_llm_itinerary_response(
+        self, raw_content: Optional[str], request: ItineraryRequest
+    ) -> Optional[ItineraryResponse]:
+        """Try to convert LLM output into an ItineraryResponse."""
+
+        if not raw_content:
+            return None
+
+        if isinstance(raw_content, list):
+            parts = []
+            for segment in raw_content:
+                if isinstance(segment, dict):
+                    if segment.get("text"):
+                        parts.append(str(segment["text"]))
+                    elif isinstance(segment.get("content"), str):
+                        parts.append(segment["content"])
+                    else:
+                        parts.append(str(segment))
+                else:
+                    parts.append(str(segment))
+            raw_content = "".join(parts)
+
+        if not isinstance(raw_content, str):
+            return None
+
+        try:
+            data = json.loads(raw_content)
+        except json.JSONDecodeError:
+            match = re.search(r"\{.*\}", raw_content, re.S)
+            if not match:
+                return None
+            try:
+                data = json.loads(match.group())
+            except json.JSONDecodeError:
+                return None
+
+        if not isinstance(data, dict):
+            return None
+
+        destination_value = data.get("destination")
+        if isinstance(destination_value, str):
+            destination_value = destination_value.strip()
+        elif isinstance(destination_value, list):
+            joined = " ".join(str(item).strip() for item in destination_value if item)
+            destination_value = joined.strip() if joined else None
+        elif destination_value is not None:
+            destination_value = str(destination_value).strip()
+
+        data["destination"] = destination_value or request.destination
+        data.setdefault("start_date", request.start_date.isoformat())
+        data.setdefault("end_date", request.end_date.isoformat())
+        data["budget"] = (
+            self._coerce_currency_value(data.get("budget", request.budget))
+            or request.budget
+        )
+
+        daily = data.get("daily_itinerary")
+        if not isinstance(daily, list):
+            return None
+
+        normalized_days = []
+        for index, day in enumerate(daily):
+            if not isinstance(day, dict):
+                continue
+            normalized = dict(day)
+            normalized.setdefault("day", day.get("day") or index + 1)
+            if not normalized.get("date"):
+                normalized["date"] = (
+                    request.start_date + timedelta(days=index)
+                ).isoformat()
+
+            activities = normalized.get("activities") or []
+            if isinstance(activities, dict):
+                activities = [activities]
+            normalized_activities = []
+            for activity in activities:
+                if isinstance(activity, dict):
+                    normalized_activities.append(activity)
+            normalized["activities"] = normalized_activities
+
+            if (
+                "total_estimated_cost" not in normalized
+                or normalized["total_estimated_cost"] is None
+            ):
+                normalized["total_estimated_cost"] = sum(
+                    self._coerce_currency_value(activity.get("estimated_cost")) or 0
+                    for activity in normalized_activities
+                    if isinstance(activity, dict)
+                )
+            else:
+                normalized["total_estimated_cost"] = (
+                    self._coerce_currency_value(normalized.get("total_estimated_cost"))
+                    or 0
+                )
+
+            normalized_days.append(normalized)
+
+        if not normalized_days:
+            return None
+
+        data["daily_itinerary"] = normalized_days
+
+        if not data.get("total_estimated_cost"):
+            data["total_estimated_cost"] = sum(
+                (self._coerce_currency_value(day.get("total_estimated_cost")) or 0)
+                for day in normalized_days
+            )
+        else:
+            data["total_estimated_cost"] = (
+                self._coerce_currency_value(data.get("total_estimated_cost")) or 0
+            )
+
+        try:
+            return ItineraryResponse(**data)
+        except ValidationError as exc:
+            print(f"LLM response validation error: {exc}")
+            return None
+
+    def _coerce_currency_value(self, value) -> Optional[float]:
+        """Convert various currency formats into float."""
+
+        if value is None:
+            return None
+
+        if isinstance(value, (int, float)):
+            return float(value)
+
+        if isinstance(value, str):
+            cleaned = value.strip()
+            cleaned = cleaned.replace("￥", "").replace("¥", "")
+            cleaned = cleaned.replace(",", "")
+            match = re.search(r"(-?\d+(?:\.\d+)?)", cleaned)
+            if match:
+                try:
+                    return float(match.group(1))
+                except ValueError:
+                    return None
+
+        return None
 
 
 llm_service = LLMService()

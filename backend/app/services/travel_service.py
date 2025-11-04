@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from app.schemas.itinerary import (
     ItineraryRequest,
     ItineraryResponse,
@@ -9,7 +9,6 @@ from app.schemas.itinerary import (
 from app.schemas.expense import ExpenseCreate, ExpenseResponse, ExpenseSummary
 from app.services.llm_service import llm_service
 from app.services.expense_service import expense_service
-from app.services.nlp_service import natural_language_service
 from app.core.database import get_supabase_client
 
 
@@ -47,15 +46,39 @@ class TravelService:
         self, user_id: str, request: ItineraryTextRequest
     ) -> ItineraryFromTextResponse:
         """Create itinerary directly from a natural language description."""
+        raw_description = request.text.strip()
 
-        parsed_request = natural_language_service.parse_text_request(request)
-        prompt = llm_service.create_itinerary_prompt(parsed_request)
+        start_date = request.start_date or (date.today() + timedelta(days=7))
+        duration_days = request.duration_days or 5
+        end_date = start_date + timedelta(days=max(duration_days - 1, 0))
+
+        placeholder_request = ItineraryRequest(
+            destination="理想目的地",
+            start_date=start_date,
+            end_date=end_date,
+            budget=6000.0,
+            preferences=[],
+            additional_notes=None,
+        )
+
+        prompt = llm_service.create_itinerary_prompt(
+            placeholder_request, user_description=raw_description
+        )
         itinerary = await self._generate_and_store_itinerary(
-            user_id, parsed_request, prompt=prompt
+            user_id, placeholder_request, prompt=prompt
+        )
+
+        structured_request = ItineraryRequest(
+            destination=itinerary.destination,
+            start_date=itinerary.start_date,
+            end_date=itinerary.end_date,
+            budget=itinerary.budget,
+            preferences=[],
+            additional_notes=raw_description or None,
         )
 
         return ItineraryFromTextResponse(
-            itinerary=itinerary, prompt=prompt, parsed_request=parsed_request
+            itinerary=itinerary, prompt=prompt, parsed_request=structured_request
         )
 
     async def _generate_and_store_itinerary(

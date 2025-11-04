@@ -1,4 +1,13 @@
 import base64
+import io
+import os
+import shutil
+import subprocess
+import tempfile
+import wave
+from typing import Optional
+
+import audioop
 
 from app.schemas.user import VoiceInput, VoiceResponse
 from app.core.config import settings
@@ -25,31 +34,124 @@ class VoiceService:
             Recognized text and confidence score
         """
         audio_bytes = base64.b64decode(voice_input.audio_data)
-
-        if self._client.is_configured:
-            try:
-                recognized_text = await self._client.transcribe(
-                    audio_bytes, voice_input.language
-                )
-                return VoiceResponse(text=recognized_text, confidence=0.9)
-            except NotImplementedError:
-                # Placeholder until the official SDK is wired in
-                pass
-            except Exception as exc:  # pragma: no cover - external dependency
-                print(f"Error in speech recognition: {exc}")
-
-        # Return mock response when SDK is not available or integration fails
-        return VoiceResponse(
-            text="我想去北京旅游三天，预算 5000 元，喜欢美食。", confidence=0.6
-        )
+        return await self._transcribe_audio(audio_bytes, voice_input.language)
 
     async def recognize_audio_file(
         self, audio_bytes: bytes, language: str = "zh_cn"
     ) -> VoiceResponse:
         """Helper to handle raw audio bytes coming from file uploads."""
-        encoded = base64.b64encode(audio_bytes).decode("utf-8")
-        voice_input = VoiceInput(audio_data=encoded, language=language)
-        return await self.recognize_speech(voice_input)
+        return await self._transcribe_audio(audio_bytes, language)
+
+    async def _transcribe_audio(
+        self, audio_bytes: bytes, language: str = "zh_cn"
+    ) -> VoiceResponse:
+        if not audio_bytes:
+            raise ValueError("Audio payload is empty.")
+
+        if not self._client.is_configured:
+            raise RuntimeError("iFlytek credentials are not configured.")
+
+        pcm_bytes = self._ensure_pcm16(audio_bytes)
+        try:
+            recognized_text = await self._client.transcribe(pcm_bytes, language)
+        except Exception as exc:
+            raise RuntimeError(f"iFlytek transcription failed: {exc}") from exc
+
+        return VoiceResponse(text=recognized_text, confidence=0.9)
+
+    def _ensure_pcm16(self, audio_bytes: bytes) -> bytes:
+        if self._looks_like_wav(audio_bytes):
+            return self._extract_pcm_from_wav(audio_bytes)
+
+        converted = self._convert_with_ffmpeg(audio_bytes)
+        if converted is not None:
+            return self._extract_pcm_from_wav(converted)
+
+        raise ValueError(
+            "Unsupported audio format. Please upload WAV/PCM audio or install FFmpeg for automatic conversion."
+        )
+
+    def _looks_like_wav(self, audio_bytes: bytes) -> bool:
+        return (
+            len(audio_bytes) > 12
+            and audio_bytes[:4] == b"RIFF"
+            and audio_bytes[8:12] == b"WAVE"
+        )
+
+    def _extract_pcm_from_wav(self, wav_bytes: bytes) -> bytes:
+        with wave.open(io.BytesIO(wav_bytes)) as wav_file:
+            channels = wav_file.getnchannels()
+            sample_width = wav_file.getsampwidth()
+            frame_rate = wav_file.getframerate()
+            frames = wav_file.readframes(wav_file.getnframes())
+
+        if sample_width != 2:
+            frames = audioop.lin2lin(frames, sample_width, 2)
+            sample_width = 2
+
+        if channels != 1:
+            frames = audioop.tomono(frames, sample_width, 0.5, 0.5)
+            channels = 1
+
+        if frame_rate != 16000:
+            frames, _ = audioop.ratecv(
+                frames, sample_width, channels, frame_rate, 16000, None
+            )
+
+        return frames
+
+    def _convert_with_ffmpeg(self, audio_bytes: bytes) -> Optional[bytes]:
+        ffmpeg_path = self._ffmpeg_path()
+        if not ffmpeg_path:
+            print("FFmpeg executable not found; cannot convert audio format.")
+            return None
+
+        with tempfile.NamedTemporaryFile(suffix=".input", delete=False) as src:
+            src.write(audio_bytes)
+            src_path = src.name
+
+        dst_path = src_path + ".wav"
+
+        try:
+            print(f"Running FFmpeg on {src_path} to produce 16k PCM wav: {dst_path}")
+            subprocess.run(
+                [
+                    ffmpeg_path,
+                    "-y",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-i",
+                    src_path,
+                    "-ar",
+                    "16000",
+                    "-ac",
+                    "1",
+                    dst_path,
+                ],
+                check=True,
+            )
+            with open(dst_path, "rb") as converted:
+                print("FFmpeg conversion succeeded, returning WAV bytes.")
+                return converted.read()
+        except FileNotFoundError:
+            print("FFmpeg executable not found at runtime.")
+            return None
+        except subprocess.CalledProcessError as exc:
+            print(f"FFmpeg conversion failed: {exc}")
+            return None
+        finally:
+            try:
+                os.remove(src_path)
+            except OSError:
+                pass
+            try:
+                os.remove(dst_path)
+            except OSError:
+                pass
+
+    def _ffmpeg_path(self) -> Optional[str]:
+        return shutil.which("ffmpeg")
 
 
 voice_service = VoiceService()

@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useItineraryStore } from '../stores/itinerary';
 import { itineraryService } from '../services/itinerary';
+import ItineraryMap from '../components/ItineraryMap.vue';
 
 const route = useRoute();
 const itineraryStore = useItineraryStore();
@@ -44,10 +45,47 @@ const structuredDays = computed(() => {
         location: activity.location || activity.place || '地点待定',
         estimated_cost: activity.estimated_cost ?? null,
         notes: activity.notes || activity.description || '',
+        latitude:
+          activity.latitude ??
+          activity.lat ??
+          activity.latLng?.lat ??
+          activity.location?.lat ??
+          null,
+        longitude:
+          activity.longitude ??
+          activity.lng ??
+          activity.latLng?.lng ??
+          activity.location?.lng ??
+          null,
       })),
     };
   });
 });
+
+const mapDestination = computed(() => (itinerary.value?.destination || '').trim());
+
+const mapPoints = computed(() => {
+  return structuredDays.value.flatMap((day) =>
+    day.activities
+      .filter((activity) => activity && activity.location && activity.location !== '地点待定')
+      .map((activity, index) => ({
+        id: `${day.day}-${index}-${activity.location}`,
+        day: day.day,
+        time: activity.time,
+        title: activity.activity,
+        location: activity.location,
+        notes: activity.notes,
+        latitude: activity.latitude,
+        longitude: activity.longitude,
+      }))
+  );
+});
+
+const mapEmptyMessage = computed(() =>
+  mapDestination.value
+    ? '行程地点缺少坐标时，地图会尝试通过地理编码定位。'
+    : '等待加载行程数据，地图暂无法定位。'
+);
 
 const budgetOverview = computed(() => {
   const planned = itinerary.value?.budget ?? 0;
@@ -107,87 +145,100 @@ watch(
       <p>行程加载中...</p>
     </div>
 
-    <div v-else-if="itinerary" class="itinerary-detail">
-      <div class="header">
-        <div>
-          <h1>{{ itinerary.destination || '行程详情' }}</h1>
-          <p class="dates">
-            {{ formatDate(itinerary.start_date) || '日期待定' }} -
-            {{ formatDate(itinerary.end_date) || '日期待定' }}
-          </p>
+    <div v-else-if="itinerary" class="detail-layout">
+      <div class="itinerary-detail">
+        <div class="header">
+          <div>
+            <h1>{{ itinerary.destination || '行程详情' }}</h1>
+            <p class="dates">
+              {{ formatDate(itinerary.start_date) || '日期待定' }} -
+              {{ formatDate(itinerary.end_date) || '日期待定' }}
+            </p>
+          </div>
+          <router-link to="/itineraries" class="btn btn-secondary">返回列表</router-link>
         </div>
-        <router-link to="/itineraries" class="btn btn-secondary">返回列表</router-link>
-      </div>
 
-      <div class="budget-overview card">
-        <h2>预算总览</h2>
-        <div class="budget-stats">
-          <div class="stat">
-            <span class="label">计划预算</span>
-            <span class="value">¥{{ formatCurrency(budgetOverview.planned) }}</span>
+        <div class="budget-overview card">
+          <h2>预算总览</h2>
+          <div class="budget-stats">
+            <div class="stat">
+              <span class="label">计划预算</span>
+              <span class="value">¥{{ formatCurrency(budgetOverview.planned) }}</span>
+            </div>
+            <div class="stat">
+              <span class="label">预估花费</span>
+              <span class="value">¥{{ formatCurrency(budgetOverview.estimated) }}</span>
+            </div>
+            <div class="stat">
+              <span class="label">实际支出</span>
+              <span class="value">¥{{ formatCurrency(budgetOverview.actual) }}</span>
+            </div>
+            <div class="stat">
+              <span class="label">剩余预算</span>
+              <span class="value" :class="{ negative: (budgetOverview.remaining ?? 0) < 0 }">
+                ¥{{ formatCurrency(budgetOverview.remaining) }}
+              </span>
+            </div>
           </div>
-          <div class="stat">
-            <span class="label">预估花费</span>
-            <span class="value">¥{{ formatCurrency(budgetOverview.estimated) }}</span>
-          </div>
-          <div class="stat">
-            <span class="label">实际支出</span>
-            <span class="value">¥{{ formatCurrency(budgetOverview.actual) }}</span>
-          </div>
-          <div class="stat">
-            <span class="label">剩余预算</span>
-            <span class="value" :class="{ negative: (budgetOverview.remaining ?? 0) < 0 }">
-              ¥{{ formatCurrency(budgetOverview.remaining) }}
-            </span>
-          </div>
-        </div>
-        <div class="budget-progress" v-if="budgetOverview.spentPercentage">
-          <div
-            class="budget-progress-bar"
-            :style="{ width: `${Math.min(budgetOverview.spentPercentage, 100)}%` }"
-          ></div>
-        </div>
-      </div>
-
-      <div class="recommendations card" v-if="itinerary.recommendations">
-        <h2>💡 行程建议</h2>
-        <p>{{ itinerary.recommendations }}</p>
-      </div>
-
-      <div class="daily-itinerary card">
-        <h2>每日安排</h2>
-        <div v-if="!structuredDays.length" class="empty-state">
-          暂无详细行程，稍后可在此补充每日规划。
-        </div>
-        <div
-          v-for="day in structuredDays"
-          :key="day.day"
-          class="day-card"
-        >
-          <div class="day-header">
-            <h3>第 {{ day.day }} 天 · {{ formatDate(day.date) || '日期待定' }}</h3>
-            <span class="day-cost">¥{{ formatCurrency(day.total_estimated_cost) }}</span>
-          </div>
-
-          <div class="activities">
+          <div class="budget-progress" v-if="budgetOverview.spentPercentage">
             <div
-              v-for="(activity, index) in day.activities"
-              :key="index"
-              class="activity"
-            >
-              <div class="activity-time">{{ formatTime(activity.time) || '时间待定' }}</div>
-              <div class="activity-content">
-                <h4>{{ activity.activity }}</h4>
-                <p class="location">📍 {{ activity.location }}</p>
-                <p v-if="activity.notes" class="notes">{{ activity.notes }}</p>
-                <p v-if="activity.estimated_cost" class="cost">
-                  💰 ¥{{ formatCurrency(activity.estimated_cost) }}
-                </p>
+              class="budget-progress-bar"
+              :style="{ width: `${Math.min(budgetOverview.spentPercentage, 100)}%` }"
+            ></div>
+          </div>
+        </div>
+
+        <div class="recommendations card" v-if="itinerary.recommendations">
+          <h2>💡 行程建议</h2>
+          <p>{{ itinerary.recommendations }}</p>
+        </div>
+
+        <div class="daily-itinerary card">
+          <h2>每日安排</h2>
+          <div v-if="!structuredDays.length" class="empty-state">
+            暂无详细行程，稍后可在此补充每日规划。
+          </div>
+          <div
+            v-for="day in structuredDays"
+            :key="day.day"
+            class="day-card"
+          >
+            <div class="day-header">
+              <h3>第 {{ day.day }} 天 · {{ formatDate(day.date) || '日期待定' }}</h3>
+              <span class="day-cost">¥{{ formatCurrency(day.total_estimated_cost) }}</span>
+            </div>
+
+            <div class="activities">
+              <div
+                v-for="(activity, index) in day.activities"
+                :key="index"
+                class="activity"
+              >
+                <div class="activity-time">{{ formatTime(activity.time) || '时间待定' }}</div>
+                <div class="activity-content">
+                  <h4>{{ activity.activity }}</h4>
+                  <p class="location">📍 {{ activity.location }}</p>
+                  <p v-if="activity.notes" class="notes">{{ activity.notes }}</p>
+                  <p v-if="activity.estimated_cost" class="cost">
+                    💰 ¥{{ formatCurrency(activity.estimated_cost) }}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <aside class="detail-map">
+        <ItineraryMap
+          :destination="mapDestination"
+          :points="mapPoints"
+          :empty-text="mapEmptyMessage"
+        />
+        <p class="map-caption">
+          地图会根据行程地点自动更新标注，若缺少坐标则尝试使用城市和地点名称定位。
+        </p>
+      </aside>
     </div>
 
     <div v-else class="error">
@@ -199,7 +250,7 @@ watch(
 
 <style scoped>
 .container {
-  max-width: 960px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
 }
@@ -219,10 +270,32 @@ watch(
   color: #666;
 }
 
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
 .itinerary-detail {
   display: flex;
   flex-direction: column;
   gap: 2rem;
+}
+
+.detail-map {
+  position: sticky;
+  top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.map-caption {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #6c757d;
+  line-height: 1.5;
 }
 
 .card {
@@ -398,5 +471,21 @@ watch(
 .btn-secondary {
   background: #f1f3f5;
   color: #495057;
+}
+
+@media (max-width: 1100px) {
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-map {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 1.5rem 1rem;
+  }
 }
 </style>

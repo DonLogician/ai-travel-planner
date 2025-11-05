@@ -1,8 +1,9 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useItineraryStore } from '../stores/itinerary';
 import VoiceRecorder from '../components/VoiceRecorder.vue';
+import ItineraryMap from '../components/ItineraryMap.vue';
 
 const router = useRouter();
 const itineraryStore = useItineraryStore();
@@ -99,11 +100,57 @@ const formatCurrency = (value) => {
     maximumFractionDigits: 0,
   });
 };
+
+const mapDestination = computed(() => {
+  const aiDestination = aiResult.value?.itinerary?.destination || '';
+  const formDestination = form.value.destination || '';
+  return (aiDestination || formDestination).trim();
+});
+
+const mapPoints = computed(() => {
+  const itinerary = aiResult.value?.itinerary;
+  if (!itinerary || !Array.isArray(itinerary.daily_itinerary)) {
+    return [];
+  }
+
+  return itinerary.daily_itinerary.flatMap((day) => {
+    const activities = Array.isArray(day?.activities) ? day.activities : [];
+    return activities
+      .filter((activity) => activity && (activity.location || activity.name))
+      .map((activity, index) => ({
+        id: `${day.day || index}-${index}-${activity.location || activity.name || 'poi'}`,
+        day: day.day,
+        time: activity.time,
+        title: activity.activity || activity.title || activity.name,
+        location: activity.location || activity.name || '',
+        notes: activity.notes || activity.description || '',
+        latitude:
+          activity.latitude ??
+          activity.lat ??
+          activity.latLng?.lat ??
+          activity.location?.lat ??
+          null,
+        longitude:
+          activity.longitude ??
+          activity.lng ??
+          activity.latLng?.lng ??
+          activity.location?.lng ??
+          null,
+      }));
+  });
+});
+
+const mapEmptyMessage = computed(() => {
+  return mapDestination.value
+    ? '等待 AI 生成的详细行程地点，或继续完善表单信息。'
+    : '填写目的地后，右侧地图会自动定位所在城市。';
+});
 </script>
 
 <template>
-  <div class="container">
-    <div class="create-itinerary">
+  <div class="planner-wrapper">
+    <div class="planner-layout">
+      <div class="create-itinerary">
       <h1>创建专属行程</h1>
       <p class="subtitle">
         填写旅行需求或直接语音描述，AI 会为你生成个性化的每日行程与预算建议
@@ -270,17 +317,72 @@ const formatCurrency = (value) => {
           <router-link to="/itineraries" class="btn btn-secondary">取消</router-link>
         </div>
       </form>
+      </div>
+
+      <aside class="planner-map">
+        <ItineraryMap
+          :destination="mapDestination"
+          :points="mapPoints"
+          :empty-text="mapEmptyMessage"
+        />
+        <p class="map-caption">
+          地图会尝试根据目的地和行程地点自动定位，缺少坐标时将显示提示信息。
+        </p>
+      </aside>
     </div>
   </div>
 </template>
 
 <style scoped>
-.create-itinerary {
-  max-width: 900px;
+.planner-wrapper {
+  max-width: 1200px;
   margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.planner-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.create-itinerary {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 2rem;
+}
+
+.planner-map {
+  position: sticky;
+  top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.map-caption {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #6c757d;
+  line-height: 1.5;
+}
+
+@media (max-width: 1100px) {
+  .planner-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-map {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .planner-wrapper {
+    padding: 1.5rem 1rem;
+  }
 }
 
 .create-itinerary h1 {

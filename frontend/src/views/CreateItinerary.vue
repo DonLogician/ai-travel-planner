@@ -101,288 +101,224 @@ const formatCurrency = (value) => {
   });
 };
 
-const mapDestination = computed(() => {
-  const aiDestination = aiResult.value?.itinerary?.destination || '';
-  const formDestination = form.value.destination || '';
-  return (aiDestination || formDestination).trim();
-});
+const mapDestination = computed(
+  () => aiResult.value?.itinerary?.destination || form.value.destination || ''
+);
 
-const mapPoints = computed(() => {
-  const itinerary = aiResult.value?.itinerary;
-  if (!itinerary || !Array.isArray(itinerary.daily_itinerary)) {
-    return [];
-  }
-
-  return itinerary.daily_itinerary.flatMap((day) => {
-    const activities = Array.isArray(day?.activities) ? day.activities : [];
-    return activities
-      .filter((activity) => activity && (activity.location || activity.name))
-      .map((activity, index) => ({
-        id: `${day.day || index}-${index}-${activity.location || activity.name || 'poi'}`,
-        day: day.day,
-        time: activity.time,
-        title: activity.activity || activity.title || activity.name,
-        location: activity.location || activity.name || '',
-        notes: activity.notes || activity.description || '',
-        latitude:
-          activity.latitude ??
-          activity.lat ??
-          activity.latLng?.lat ??
-          activity.location?.lat ??
-          null,
-        longitude:
-          activity.longitude ??
-          activity.lng ??
-          activity.latLng?.lng ??
-          activity.location?.lng ??
-          null,
-      }));
-  });
-});
-
-const mapEmptyMessage = computed(() => {
-  return mapDestination.value
-    ? '等待 AI 生成的详细行程地点，或继续完善表单信息。'
-    : '填写目的地后，右侧地图会自动定位所在城市。';
-});
+const mapDailyItinerary = computed(
+  () => aiResult.value?.itinerary?.daily_itinerary || []
+);
 </script>
 
 <template>
-  <div class="planner-wrapper">
-    <div class="planner-layout">
-      <div class="create-itinerary">
-      <h1>创建专属行程</h1>
-      <p class="subtitle">
-        填写旅行需求或直接语音描述，AI 会为你生成个性化的每日行程与预算建议
-      </p>
+  <div class="container">
+    <div class="create-itinerary">
+      <div class="create-itinerary__layout">
+        <div class="create-itinerary__content">
+          <h1>创建专属行程</h1>
+          <p class="subtitle">
+            填写旅行需求或直接语音描述，AI 会为你生成个性化的每日行程与预算建议
+          </p>
 
-      <section class="ai-section card">
-        <div class="section-header">
-          <div>
-            <h2>语音 / 文本快速创建</h2>
-            <p>按下录音或直接输入文字，让 AI 帮你一键生成行程计划。</p>
-          </div>
-        </div>
-
-        <VoiceRecorder :disabled="aiLoading" @submit-text="handleVoiceSubmit" />
-
-        <p v-if="aiError" class="error">{{ aiError }}</p>
-        <p v-if="aiLoading" class="loading">AI 正在生成行程，请稍候...</p>
-
-        <div v-if="aiResult?.itinerary" class="ai-result">
-          <div class="ai-result__header">
-            <div>
-              <h3>{{ aiResult.itinerary.destination }}</h3>
-              <p class="ai-result__dates">
-                {{ formatDate(aiResult.itinerary.start_date) }} -
-                {{ formatDate(aiResult.itinerary.end_date) }}
-              </p>
-            </div>
-            <div class="ai-result__budget">
-              <p>计划预算</p>
-              <strong>¥{{ formatCurrency(aiResult.itinerary.budget) }}</strong>
-            </div>
-          </div>
-
-          <div class="ai-result__summary">
-            <div>
-              <span>预估花费</span>
-              <strong>¥{{ formatCurrency(aiResult.itinerary.total_estimated_cost) }}</strong>
-            </div>
-            <div>
-              <span>行程天数</span>
-              <strong>{{ aiResult.itinerary.daily_itinerary?.length || 0 }} 天</strong>
-            </div>
-          </div>
-
-          <div v-if="aiResult.itinerary.recommendations" class="ai-result__recommendations">
-            <h4>行程建议</h4>
-            <p>{{ aiResult.itinerary.recommendations }}</p>
-          </div>
-
-          <div class="ai-result__days">
-            <div
-              v-for="day in aiResult.itinerary.daily_itinerary"
-              :key="day.day"
-              class="ai-result__day"
-            >
-              <div class="ai-result__day-header">
-                <h4>第 {{ day.day }} 天 · {{ formatDate(day.date) }}</h4>
-                <span>预计 ¥{{ formatCurrency(day.total_estimated_cost) }}</span>
+          <section class="ai-section card">
+            <div class="section-header">
+              <div>
+                <h2>语音 / 文本快速创建</h2>
+                <p>按下录音或直接输入文字，让 AI 帮你一键生成行程计划。</p>
               </div>
-              <ul class="ai-result__activities">
-                <li v-for="(activity, index) in day.activities" :key="index">
-                  <span class="time">{{ activity.time || '时间待定' }}</span>
-                  <div class="content">
-                    <p class="title">{{ activity.activity }}</p>
-                    <p class="meta">📍 {{ activity.location }}</p>
-                    <p v-if="activity.notes" class="notes">{{ activity.notes }}</p>
-                    <p v-if="activity.estimated_cost" class="cost">
-                      约 ¥{{ formatCurrency(activity.estimated_cost) }}
-                    </p>
-                  </div>
-                </li>
-              </ul>
             </div>
-          </div>
 
-          <details v-if="aiResult.prompt" class="ai-result__prompt">
-            <summary>查看生成 Prompt</summary>
-            <pre>{{ aiResult.prompt }}</pre>
-          </details>
+            <VoiceRecorder :disabled="aiLoading" @submit-text="handleVoiceSubmit" />
 
-          <div class="ai-result__actions">
-            <router-link
-              v-if="aiResult.itinerary.id"
-              class="btn btn-primary"
-              :to="`/itineraries/${aiResult.itinerary.id}`"
-            >
-              查看完整行程
-            </router-link>
-            <button type="button" class="btn btn-secondary" @click="clearAiResult">
-              清除结果
-            </button>
-          </div>
+            <p v-if="aiError" class="error">{{ aiError }}</p>
+            <p v-if="aiLoading" class="loading">AI 正在生成行程，请稍候...</p>
+
+            <div v-if="aiResult?.itinerary" class="ai-result">
+              <div class="ai-result__header">
+                <div>
+                  <h3>{{ aiResult.itinerary.destination }}</h3>
+                  <p class="ai-result__dates">
+                    {{ formatDate(aiResult.itinerary.start_date) }} -
+                    {{ formatDate(aiResult.itinerary.end_date) }}
+                  </p>
+                </div>
+                <div class="ai-result__budget">
+                  <p>计划预算</p>
+                  <strong>¥{{ formatCurrency(aiResult.itinerary.budget) }}</strong>
+                </div>
+              </div>
+
+              <div class="ai-result__summary">
+                <div>
+                  <span>预估花费</span>
+                  <strong>¥{{ formatCurrency(aiResult.itinerary.total_estimated_cost) }}</strong>
+                </div>
+                <div>
+                  <span>行程天数</span>
+                  <strong>{{ aiResult.itinerary.daily_itinerary?.length || 0 }} 天</strong>
+                </div>
+              </div>
+
+              <div v-if="aiResult.itinerary.recommendations" class="ai-result__recommendations">
+                <h4>行程建议</h4>
+                <p>{{ aiResult.itinerary.recommendations }}</p>
+              </div>
+
+              <div class="ai-result__days">
+                <div
+                  v-for="day in aiResult.itinerary.daily_itinerary"
+                  :key="day.day"
+                  class="ai-result__day"
+                >
+                  <div class="ai-result__day-header">
+                    <h4>第 {{ day.day }} 天 · {{ formatDate(day.date) }}</h4>
+                    <span>预计 ¥{{ formatCurrency(day.total_estimated_cost) }}</span>
+                  </div>
+                  <ul class="ai-result__activities">
+                    <li v-for="(activity, index) in day.activities" :key="index">
+                      <span class="time">{{ activity.time || '时间待定' }}</span>
+                      <div class="content">
+                        <p class="title">{{ activity.activity }}</p>
+                        <p class="meta">📍 {{ activity.location }}</p>
+                        <p v-if="activity.notes" class="notes">{{ activity.notes }}</p>
+                        <p v-if="activity.estimated_cost" class="cost">
+                          约 ¥{{ formatCurrency(activity.estimated_cost) }}
+                        </p>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <details v-if="aiResult.prompt" class="ai-result__prompt">
+                <summary>查看生成 Prompt</summary>
+                <pre>{{ aiResult.prompt }}</pre>
+              </details>
+
+              <div class="ai-result__actions">
+                <router-link
+                  v-if="aiResult.itinerary.id"
+                  class="btn btn-primary"
+                  :to="`/itineraries/${aiResult.itinerary.id}`"
+                >
+                  查看完整行程
+                </router-link>
+                <button type="button" class="btn btn-secondary" @click="clearAiResult">
+                  清除结果
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <div v-if="error" class="error">{{ error }}</div>
+
+          <form @submit.prevent="handleSubmit" class="card manual-form">
+            <div class="form-group">
+              <label for="destination">目的地 *</label>
+              <input
+                id="destination"
+                v-model="form.destination"
+                type="text"
+                placeholder="例如：北京、巴黎、东京"
+                required
+              />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="start_date">出发日期 *</label>
+                <input id="start_date" v-model="form.start_date" type="date" required />
+              </div>
+
+              <div class="form-group">
+                <label for="end_date">返回日期 *</label>
+                <input id="end_date" v-model="form.end_date" type="date" required />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="budget">预算 (¥) *</label>
+              <input
+                id="budget"
+                v-model.number="form.budget"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="例如：5000"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label>旅行偏好</label>
+              <div class="preference-chips">
+                <button
+                  v-for="option in preferenceOptions"
+                  :key="option.value"
+                  type="button"
+                  class="chip"
+                  :class="{ active: form.preferences.includes(option.value) }"
+                  @click="togglePreference(option.value)"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="additional_notes">补充说明</label>
+              <textarea
+                id="additional_notes"
+                v-model="form.additional_notes"
+                placeholder="如有特殊需求或更多偏好，请在此补充..."
+              ></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" :disabled="loading">
+                {{ loading ? '正在生成行程...' : '生成行程' }}
+              </button>
+              <router-link to="/itineraries" class="btn btn-secondary">取消</router-link>
+            </div>
+          </form>
         </div>
-      </section>
-
-      <div v-if="error" class="error">{{ error }}</div>
-
-      <form @submit.prevent="handleSubmit" class="card manual-form">
-        <div class="form-group">
-          <label for="destination">目的地 *</label>
-          <input
-            id="destination"
-            v-model="form.destination"
-            type="text"
-            placeholder="例如：北京、巴黎、东京"
-            required
+        <aside class="create-itinerary__map">
+          <ItineraryMap
+            :destination="mapDestination"
+            :daily-itinerary="mapDailyItinerary"
+            min-height="640px"
           />
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label for="start_date">出发日期 *</label>
-            <input id="start_date" v-model="form.start_date" type="date" required />
-          </div>
-
-          <div class="form-group">
-            <label for="end_date">返回日期 *</label>
-            <input id="end_date" v-model="form.end_date" type="date" required />
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="budget">预算 (¥) *</label>
-          <input
-            id="budget"
-            v-model.number="form.budget"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="例如：5000"
-            required
-          />
-        </div>
-
-        <div class="form-group">
-          <label>旅行偏好</label>
-          <div class="preference-chips">
-            <button
-              v-for="option in preferenceOptions"
-              :key="option.value"
-              type="button"
-              class="chip"
-              :class="{ active: form.preferences.includes(option.value) }"
-              @click="togglePreference(option.value)"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="additional_notes">补充说明</label>
-          <textarea
-            id="additional_notes"
-            v-model="form.additional_notes"
-            placeholder="如有特殊需求或更多偏好，请在此补充..."
-          ></textarea>
-        </div>
-
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary" :disabled="loading">
-            {{ loading ? '正在生成行程...' : '生成行程' }}
-          </button>
-          <router-link to="/itineraries" class="btn btn-secondary">取消</router-link>
-        </div>
-      </form>
+        </aside>
       </div>
-
-      <aside class="planner-map">
-        <ItineraryMap
-          :destination="mapDestination"
-          :points="mapPoints"
-          :empty-text="mapEmptyMessage"
-        />
-        <p class="map-caption">
-          地图会尝试根据目的地和行程地点自动定位，缺少坐标时将显示提示信息。
-        </p>
-      </aside>
     </div>
   </div>
 </template>
 
 <style scoped>
-.planner-wrapper {
-  max-width: 1200px;
+.create-itinerary {
+  max-width: 1240px;
   margin: 0 auto;
-  padding: 2rem 1.5rem;
+  padding: 0 0 2rem;
 }
 
-.planner-layout {
+.create-itinerary__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 2.5rem;
   align-items: flex-start;
 }
 
-.create-itinerary {
-  width: 100%;
+.create-itinerary__content {
   display: flex;
   flex-direction: column;
   gap: 2rem;
 }
 
-.planner-map {
+.create-itinerary__map {
   position: sticky;
-  top: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.map-caption {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #6c757d;
-  line-height: 1.5;
-}
-
-@media (max-width: 1100px) {
-  .planner-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .planner-map {
-    position: static;
-  }
-}
-
-@media (max-width: 640px) {
-  .planner-wrapper {
-    padding: 1.5rem 1rem;
-  }
+  top: 1.5rem;
+  height: fit-content;
+  display: block;
 }
 
 .create-itinerary h1 {
@@ -637,5 +573,17 @@ const mapEmptyMessage = computed(() => {
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+@media (max-width: 1024px) {
+  .create-itinerary__layout {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .create-itinerary__map {
+    position: static;
+    order: -1;
+  }
 }
 </style>

@@ -1,389 +1,393 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { loadAmap } from '../services/mapLoader';
 
-const locationCache = new Map();
-
 const props = defineProps({
-  destination: { type: String, default: '' },
-  points: { type: Array, default: () => [] },
-  autoFit: { type: Boolean, default: true },
-  emptyText: { type: String, default: '暂时没有可展示的地点。' },
-  loadingText: { type: String, default: '地图加载中...' },
+	destination: {
+		type: String,
+		default: '',
+	},
+	dailyItinerary: {
+		type: Array,
+		default: () => [],
+	},
+	minHeight: {
+		type: String,
+		default: '460px',
+	},
 });
 
-const mapElement = ref(null);
-const mapInstance = ref(null);
-const amapApi = ref(null);
-const geocoder = ref(null);
-const infoWindow = ref(null);
-const mapReady = ref(false);
-const loading = ref(true);
-const error = ref(null);
-const helperMessage = ref('正在初始化地图...');
-const markers = ref([]);
-let updateToken = 0;
+const mapContainer = ref(null);
+const mapInstance = shallowRef(null);
+const markers = shallowRef([]);
+const infoWindow = shallowRef(null);
+const isLoading = ref(true);
+const loadError = ref('');
 
-const normalizedPoints = computed(() => {
-  return props.points
-    .map((item, index) => {
-      if (!item) {
-        return null;
-      }
+const FALLBACK_LOCATIONS = {
+	beijing: {
+		label: '北京',
+		center: [116.407394, 39.904211],
+		markers: [
+			{
+				name: '天安门广场',
+				position: [116.403963, 39.915119],
+				description: '首都地标，升旗仪式和人民英雄纪念碑所在。',
+			},
+			{
+				name: '故宫博物院',
+				position: [116.397451, 39.909167],
+				description: '世界五大宫之首，建议预留半天参观。',
+			},
+			{
+				name: '南锣鼓巷',
+				position: [116.403318, 39.935169],
+				description: '胡同漫步与传统小吃的热门街区。',
+			},
+			{
+				name: '798 艺术区',
+				position: [116.496847, 39.984104],
+				description: '现代艺术园区，适合拍照与欣赏展览。',
+			},
+			{
+				name: '慕田峪长城',
+				position: [116.560509, 40.437437],
+				description: '景观壮丽的长城段落，可乘坐索道上下。',
+			},
+		],
+	},
+};
 
-      const latCandidates = [
-        item.latitude,
-        item.lat,
-        item.latLng?.lat,
-        item.location?.lat,
-        item.position?.lat,
-      ];
-      const lngCandidates = [
-        item.longitude,
-        item.lng,
-        item.latLng?.lng,
-        item.location?.lng,
-        item.position?.lng,
-      ];
+const normalizeDestination = (raw) => (raw || '').trim().toLowerCase();
 
-      const latitude = extractNumber(latCandidates);
-      const longitude = extractNumber(lngCandidates);
-      const locationName = (item.location || item.name || '').trim();
-      const label = (item.title || item.activity || locationName || `地点 ${index + 1}`).trim();
+const hasValidCoordinates = (value) => Number.isFinite(value) && !Number.isNaN(value);
 
-      if (!label) {
-        return null;
-      }
+const extractActivityPoints = (days) => {
+	if (!Array.isArray(days)) {
+		return [];
+	}
 
-      return {
-        id: item.id ?? `${index}-${label}`,
-        label,
-        locationName,
-        day: item.day ?? null,
-        time: item.time ?? null,
-        notes: item.notes ?? '',
-        latitude,
-        longitude,
-      };
-    })
-    .filter(Boolean)
-    .slice(0, 40);
+	const points = [];
+
+	days.forEach((day, dayIndex) => {
+		const activities = Array.isArray(day?.activities) ? day.activities : [];
+
+		activities.forEach((activity, activityIndex) => {
+			const candidate = activity || {};
+			let lng;
+			let lat;
+
+			if (Array.isArray(candidate.coordinates) && candidate.coordinates.length >= 2) {
+				[lng, lat] = candidate.coordinates.map(Number);
+			} else if (
+				hasValidCoordinates(candidate.longitude) &&
+				hasValidCoordinates(candidate.latitude)
+			) {
+				lng = Number(candidate.longitude);
+				lat = Number(candidate.latitude);
+			} else if (hasValidCoordinates(candidate.lng) && hasValidCoordinates(candidate.lat)) {
+				lng = Number(candidate.lng);
+				lat = Number(candidate.lat);
+			} else if (
+				candidate.location &&
+				typeof candidate.location === 'object' &&
+				hasValidCoordinates(candidate.location.lng) &&
+				hasValidCoordinates(candidate.location.lat)
+			) {
+				lng = Number(candidate.location.lng);
+				lat = Number(candidate.location.lat);
+			}
+
+			if (hasValidCoordinates(lng) && hasValidCoordinates(lat)) {
+				points.push({
+					name:
+						candidate.activity || candidate.title || candidate.name || `活动 ${dayIndex + 1}-${activityIndex + 1}`,
+					position: [lng, lat],
+					description: candidate.notes || candidate.description || candidate.detail || '',
+					dayLabel: day?.day ? `第 ${day.day} 天` : '',
+				});
+			}
+		});
+	});
+
+	return points;
+};
+
+const extractedPoints = computed(() => extractActivityPoints(props.dailyItinerary));
+
+const wrapperStyles = computed(() => ({
+	minHeight: props.minHeight || '460px',
+}));
+
+const fallbackKey = computed(() => {
+	const normalized = normalizeDestination(props.destination);
+	if (normalized.includes('beijing') || normalized.includes('北京')) {
+		return 'beijing';
+	}
+	return 'beijing';
 });
 
-function extractNumber(candidates) {
-  for (const candidate of candidates) {
-    const parsed = Number(candidate);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-  return null;
-}
+const resolvedMarkers = computed(() => {
+	if (extractedPoints.value.length > 0) {
+		return {
+			cityLabel: props.destination || '行程地点',
+			markers: extractedPoints.value,
+			center: extractedPoints.value.length === 1 ? extractedPoints.value[0].position : null,
+			usingFallback: false,
+		};
+	}
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+	const fallback = FALLBACK_LOCATIONS[fallbackKey.value] || FALLBACK_LOCATIONS.beijing;
+	return {
+		cityLabel: fallback.label,
+		markers: fallback.markers,
+		center: fallback.center,
+		usingFallback: true,
+	};
+});
+
+const hintMessage = computed(() => {
+	if (loadError.value) {
+		return '';
+	}
+
+	if (resolvedMarkers.value.usingFallback) {
+		return props.destination
+			? `暂未获取到 ${props.destination} 的具体地点，正展示北京示例点位。`
+			: '目前展示北京示例行程，生成行程后将自动更新地点。';
+	}
+
+	return '';
+});
+
+const clearMarkers = () => {
+	markers.value.forEach((marker) => marker.setMap(null));
+	markers.value = [];
+};
+
+const buildMarkerContent = (point) => {
+	const title = point.name || '地点';
+	const day = point.dayLabel ? `<span class="day">${point.dayLabel}</span>` : '';
+	const desc = point.description ? `<p class="desc">${point.description}</p>` : '';
+	return `
+		<div class="itinerary-map__popup">
+			<strong>${title}</strong>
+			${day}
+			${desc}
+		</div>
+	`;
+};
+
+const updateMapMarkers = () => {
+	const AMap = window.AMap;
+	if (!mapInstance.value || !AMap) {
+		return;
+	}
+
+	clearMarkers();
+
+	const dataset = resolvedMarkers.value;
+	if (!dataset.markers.length) {
+		if (dataset.center) {
+			mapInstance.value.setZoomAndCenter(10, dataset.center);
+		}
+		return;
+	}
+
+	const newMarkers = dataset.markers.map((point) => {
+		const marker = new AMap.Marker({
+			position: point.position,
+			title: point.name,
+			anchor: 'bottom-center',
+			map: mapInstance.value,
+		});
+
+		if ((point.description && point.description.length) || point.dayLabel) {
+			marker.on('click', () => {
+				if (!infoWindow.value) {
+					infoWindow.value = new AMap.InfoWindow({
+						offset: new AMap.Pixel(0, -28),
+						anchor: 'bottom-center',
+					});
+				}
+				infoWindow.value.setContent(buildMarkerContent(point));
+				infoWindow.value.open(mapInstance.value, marker.getPosition());
+			});
+		}
+
+		return marker;
+	});
+
+	markers.value = newMarkers;
+
+	if (newMarkers.length > 1) {
+		mapInstance.value.setFitView(newMarkers, false, [60, 80, 60, 80]);
+	} else if (newMarkers.length === 1) {
+		mapInstance.value.setZoomAndCenter(12, newMarkers[0].getPosition());
+	} else if (dataset.center) {
+		mapInstance.value.setZoomAndCenter(10, dataset.center);
+	}
+};
 
 onMounted(async () => {
-  try {
-    const AMap = await loadAmap();
-    amapApi.value = AMap;
-    mapInstance.value = new AMap.Map(mapElement.value, {
-      viewMode: '3D',
-      zoom: 10,
-      resizeEnable: true,
-      center: [116.397428, 39.90923],
-    });
-    geocoder.value = new AMap.Geocoder();
-    infoWindow.value = new AMap.InfoWindow({
-      offset: new AMap.Pixel(0, -24),
-    });
-    mapReady.value = true;
-    loading.value = false;
-    helperMessage.value = props.emptyText;
-    await updateMap();
-  } catch (err) {
-    error.value = err?.message || '高德地图加载失败，请检查网络或 API Key。';
-    loading.value = false;
-  }
-});
+	try {
+		const AMap = await loadAmap();
+		mapInstance.value = new AMap.Map(mapContainer.value, {
+			zoom: 11,
+			viewMode: '2D',
+			resizeEnable: true,
+			center: FALLBACK_LOCATIONS.beijing.center,
+			mapStyle: 'amap://styles/whitesmoke',
+		});
 
-onBeforeUnmount(() => {
-  if (markers.value.length && mapInstance.value) {
-    mapInstance.value.remove(markers.value);
-  }
-  markers.value = [];
-  if (mapInstance.value) {
-    mapInstance.value.destroy();
-    mapInstance.value = null;
-  }
+		mapInstance.value.on('click', () => {
+			if (infoWindow.value) {
+				infoWindow.value.close();
+			}
+		});
+
+		isLoading.value = false;
+		updateMapMarkers();
+	} catch (error) {
+		loadError.value = error?.message || '地图加载失败，请稍后重试。';
+		isLoading.value = false;
+	}
 });
 
 watch(
-  [() => props.destination, normalizedPoints],
-  () => {
-    if (!mapReady.value) {
-      return;
-    }
-    updateMap();
-  },
-  { deep: true }
+	() => [props.destination, props.dailyItinerary],
+	() => {
+		if (!isLoading.value && !loadError.value) {
+			updateMapMarkers();
+		}
+	},
+	{ deep: true }
 );
 
-async function updateMap() {
-  if (!mapReady.value || !mapInstance.value || !amapApi.value) {
-    return;
-  }
+watch(
+	() => isLoading.value,
+	(loading) => {
+		if (!loading && !loadError.value) {
+			updateMapMarkers();
+		}
+	}
+);
 
-  loading.value = true;
-  error.value = null;
-  helperMessage.value = '';
-
-  if (markers.value.length) {
-    mapInstance.value.remove(markers.value);
-    markers.value = [];
-  }
-  infoWindow.value?.close();
-
-  const token = ++updateToken;
-  const resolvedMarkers = [];
-
-  for (const point of normalizedPoints.value) {
-    if (token !== updateToken) {
-      return;
-    }
-
-    const lnglat = await resolveLngLat(point, token);
-
-    if (!lnglat || token !== updateToken) {
-      continue;
-    }
-
-    const marker = new amapApi.value.Marker({
-      map: mapInstance.value,
-      position: lnglat,
-      title: point.label,
-      icon: 'https://webapi.amap.com/theme/v1.3/markers/n/mark_b.png',
-      offset: new amapApi.value.Pixel(-13, -30),
-    });
-
-    marker.setExtData({ ...point, lnglat });
-    marker.on('click', () => openInfoWindow(marker));
-    markers.value.push(marker);
-    resolvedMarkers.push(marker);
-  }
-
-  if (token !== updateToken) {
-    return;
-  }
-
-  if (resolvedMarkers.length) {
-    if (props.autoFit) {
-      mapInstance.value.setFitView(resolvedMarkers, true, [60, 60, 60, 60]);
-    }
-    helperMessage.value = '';
-  } else {
-    await focusOnDestination(token);
-  }
-
-  loading.value = false;
-}
-
-async function resolveLngLat(point, token) {
-  if (!amapApi.value) {
-    return null;
-  }
-
-  if (Number.isFinite(point.longitude) && Number.isFinite(point.latitude)) {
-    return [point.longitude, point.latitude];
-  }
-
-  if (!point.locationName) {
-    return null;
-  }
-
-  const query = point.locationName.trim();
-  if (!query) {
-    return null;
-  }
-
-  const cached = locationCache.get(query);
-  if (cached) {
-    if (typeof cached.then === 'function') {
-      return cached;
-    }
-    return cached;
-  }
-
-  const promise = new Promise((resolve) => {
-    geocoder.value?.getLocation(query, (status, result) => {
-      if (token !== updateToken) {
-        resolve(null);
-        return;
-      }
-
-      if (status === 'complete' && result?.geocodes?.length) {
-        const { location } = result.geocodes[0];
-        if (location) {
-          resolve([location.lng, location.lat]);
-          return;
-        }
-      }
-      resolve(null);
-    });
-  }).then((value) => {
-    if (value) {
-      locationCache.set(query, value);
-    } else {
-      locationCache.delete(query);
-    }
-    return value;
-  });
-
-  locationCache.set(query, promise);
-  return promise;
-}
-
-async function focusOnDestination(token) {
-  const name = (props.destination || '').trim();
-  if (!name) {
-    helperMessage.value = props.emptyText;
-    return;
-  }
-
-  try {
-    mapInstance.value.setCity(name);
-    mapInstance.value.setZoom(11);
-    helperMessage.value = `已定位到 ${name}，等待地点坐标。`;
-  } catch (err) {
-    const lnglat = await geocodeDestination(name, token);
-    if (lnglat && token === updateToken) {
-      mapInstance.value.setCenter(lnglat);
-      mapInstance.value.setZoom(11);
-      helperMessage.value = `已定位到 ${name}，可以继续完善行程地点。`;
-    } else if (token === updateToken) {
-      helperMessage.value = props.emptyText;
-    }
-  }
-}
-
-function geocodeDestination(name, token) {
-  const query = name.trim();
-  if (!query) {
-    return Promise.resolve(null);
-  }
-  return resolveLngLat({ locationName: query }, token);
-}
-
-function openInfoWindow(marker) {
-  if (!infoWindow.value || !mapInstance.value) {
-    return;
-  }
-
-  const data = marker.getExtData() || {};
-  const lines = [];
-  lines.push(`<strong>${escapeHtml(data.label)}</strong>`);
-  if (data.day) {
-    lines.push(`<div>第 ${escapeHtml(data.day)} 天 ${escapeHtml(data.time || '')}</div>`);
-  } else if (data.time) {
-    lines.push(`<div>${escapeHtml(data.time)}</div>`);
-  }
-  if (data.locationName) {
-    lines.push(`<div>📍 ${escapeHtml(data.locationName)}</div>`);
-  }
-  if (data.notes) {
-    lines.push(`<div class="notes">${escapeHtml(data.notes)}</div>`);
-  }
-
-  infoWindow.value.setContent(`<div class="map-info-window">${lines.join('')}</div>`);
-  infoWindow.value.open(mapInstance.value, marker.getPosition());
-}
+onBeforeUnmount(() => {
+	clearMarkers();
+	if (mapInstance.value) {
+		mapInstance.value.destroy();
+		mapInstance.value = null;
+	}
+});
 </script>
 
 <template>
-  <div class="itinerary-map">
-    <div ref="mapElement" class="map-canvas"></div>
+		<div class="itinerary-map" :style="wrapperStyles">
+		<div ref="mapContainer" class="itinerary-map__canvas"></div>
 
-    <transition name="fade">
-      <div v-if="loading" class="map-overlay">{{ loadingText }}</div>
-    </transition>
+		<div v-if="isLoading" class="itinerary-map__overlay">
+			<span>地图加载中...</span>
+		</div>
 
-    <transition name="fade">
-      <div v-if="!loading && error" class="map-overlay error">{{ error }}</div>
-    </transition>
+		<div v-else-if="loadError" class="itinerary-map__overlay itinerary-map__overlay--error">
+			<p>{{ loadError }}</p>
+			<p class="tip">请确认已配置 VITE_MAP_API_KEY，并可访问高德地图服务。</p>
+		</div>
 
-    <transition name="fade">
-      <div v-if="!loading && !error && helperMessage" class="map-overlay helper">
-        {{ helperMessage }}
-      </div>
-    </transition>
-  </div>
+		<div v-else-if="hintMessage" class="itinerary-map__hint">
+			{{ hintMessage }}
+		</div>
+	</div>
 </template>
 
 <style scoped>
 .itinerary-map {
-  position: relative;
-  width: 100%;
-  min-height: 420px;
-  border-radius: 20px;
-  overflow: hidden;
-  background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
-  border: 1px solid #e5e7eb;
+	position: relative;
+	width: 100%;
+	border-radius: 16px;
+	overflow: hidden;
+	background: #f1f3f5;
+	min-height: 460px;
 }
 
-.map-canvas {
-  width: 100%;
-  height: 100%;
+.itinerary-map__canvas {
+	width: 100%;
+	height: 100%;
+	min-height: inherit;
 }
 
-.map-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  text-align: center;
-  background: rgba(255, 255, 255, 0.86);
-  color: #334155;
-  font-weight: 600;
-  backdrop-filter: blur(2px);
+.itinerary-map__overlay {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(255, 255, 255, 0.85);
+	color: #333;
+	font-weight: 600;
+	text-align: center;
+	padding: 1.5rem;
 }
 
-.map-overlay.error {
-  color: #b91c1c;
-  background: rgba(254, 226, 226, 0.92);
+.itinerary-map__overlay--error {
+	color: #c53030;
+	flex-direction: column;
+	gap: 0.75rem;
+	font-weight: 500;
 }
 
-.map-overlay.helper {
-  color: #475569;
+.itinerary-map__overlay--error .tip {
+	font-size: 0.9rem;
+	color: #4a5568;
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
+.itinerary-map__hint {
+	position: absolute;
+	left: 1rem;
+	top: 1rem;
+	max-width: calc(100% - 2rem);
+	padding: 0.75rem 1rem;
+	background: rgba(102, 126, 234, 0.15);
+	color: #2c3e50;
+	border-radius: 12px;
+	font-size: 0.95rem;
+	line-height: 1.4;
+	backdrop-filter: blur(6px);
+	box-shadow: 0 8px 18px rgba(102, 126, 234, 0.18);
 }
 
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.itinerary-map__popup {
+	min-width: 180px;
+	max-width: 220px;
+	color: #1a202c;
 }
 
-:deep(.map-info-window) {
-  font-size: 0.95rem;
-  color: #1f2937;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+.itinerary-map__popup strong {
+	display: block;
+	margin-bottom: 0.25rem;
 }
 
-:deep(.map-info-window .notes) {
-  color: #64748b;
-  font-size: 0.85rem;
+.itinerary-map__popup .day {
+	display: inline-block;
+	margin-bottom: 0.25rem;
+	padding: 0.1rem 0.4rem;
+	font-size: 0.75rem;
+	color: #4c51bf;
+	background: rgba(102, 126, 234, 0.1);
+	border-radius: 999px;
+}
+
+.itinerary-map__popup .desc {
+	margin: 0;
+	font-size: 0.85rem;
+	color: #4a5568;
+	line-height: 1.4;
+}
+
+@media (max-width: 1024px) {
+	.itinerary-map {
+		min-height: 360px;
+	}
 }
 </style>

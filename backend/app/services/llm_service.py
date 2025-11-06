@@ -70,6 +70,8 @@ Make sure to include transportation and accommodation costs explicitly when esti
 
 Make sure each day includes at least lunch and dinner.
 
+Make sure location_address fields are filled with realistic addresses, and can be searched on map services.
+
 Please provide a day-by-day itinerary in JSON format with the following structure:
 {{
     "destination": "北京",
@@ -82,6 +84,7 @@ Please provide a day-by-day itinerary in JSON format with the following structur
                     "time": "09:00",
                     "activity": "Activity description",
                     "location": "Location name",
+                    "location_address": "Full location address",
                     "estimated_cost": 100.0,
                     "notes": "Additional tips"
                 }}

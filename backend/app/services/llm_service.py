@@ -60,19 +60,10 @@ class LLMService:
         )
 
         prompt = f"""
-You are a professional travel planner. Create a detailed travel itinerary according to the user's requirements.
         
-User's requirements :{user_description.strip() if user_description else 'None'}
+{user_description.strip() if user_description else 'None'}
 
-Make sure to analyze the user's requirements(which is given above) carefully, and create an itinerary that fits within the specified time, budget and duration.
-
-Make sure to include transportation and accommodation costs explicitly when estimating daily and total budgets.
-
-Make sure each day includes at least lunch and dinner.
-
-Make sure location_address fields are filled with realistic addresses, and can be searched on map services.
-
-Please provide a day-by-day itinerary in JSON format with the following structure:
+请按照以下JSON格式提供每天的行程（注意，一定要包含所有字段，尤其是location_address和is_sightseeing）：
 {{
     "destination": "北京",
     "budget": 7000,
@@ -82,21 +73,21 @@ Please provide a day-by-day itinerary in JSON format with the following structur
             "activities": [
                 {{
                     "time": "09:00",
-                    "activity": "Activity description",
-                    "location": "Location name",
-                    "location_address": "Full location address",
-                    "estimated_cost": 100.0,
-                    "notes": "Additional tips"
+                    "activity": "参观天安门广场",
+                    "location": "天安门广场",
+                    "location_address": "北京市东城区东长安街",
+                    "is_sightseeing": true,
+                    "estimated_cost": 0.0,
+                    "notes": "免费参观，建议早上去人少"
                 }}
             ]
         }}
     ],
-    "recommendations": "General tips and recommendations for the trip"
+    "recommendations": "一些旅行建议",
 }}
+确保返回的内容是有效的JSON格式，且符合上述结构，所有的键和键值都必须包含。
 
-Ensure activities are realistic, costs are reasonable, and the itinerary fits within the budget.
-Respond with valid JSON only, do not include markdown fences or extra commentary.
-请用中文给出回答。
+仅回复有效的JSON，禁用markdown，禁用小标题，禁用分点。
 """
 
         return prompt
@@ -122,7 +113,7 @@ Respond with valid JSON only, do not include markdown fences or extra commentary
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a helpful travel planner that outputs valid JSON only.",
+                        "content": "你是一个旅行规划师，帮助用户制定个性化的旅行行程。",
                     },
                     {"role": "user", "content": prompt},
                 ]
@@ -231,6 +222,8 @@ Respond with valid JSON only, do not include markdown fences or extra commentary
                 time="09:00",
                 activity=f"Morning exploration in {destination}",
                 location=f"{destination} city center",
+                location_address=None,
+                is_sightseeing=True,
                 estimated_cost=daily_budget * 0.15,
                 notes="Start early to avoid crowds",
             ),
@@ -238,6 +231,8 @@ Respond with valid JSON only, do not include markdown fences or extra commentary
                 time="12:00",
                 activity="Lunch at local restaurant",
                 location=f"Local restaurant in {destination}",
+                location_address=None,
+                is_sightseeing=False,
                 estimated_cost=daily_budget * 0.20,
                 notes="Try local specialties",
             ),
@@ -245,6 +240,8 @@ Respond with valid JSON only, do not include markdown fences or extra commentary
                 time="14:00",
                 activity=f"Visit popular attraction",
                 location=f"Main attraction in {destination}",
+                location_address=None,
+                is_sightseeing=True,
                 estimated_cost=daily_budget * 0.25,
                 notes="Book tickets in advance if possible",
             ),
@@ -252,6 +249,8 @@ Respond with valid JSON only, do not include markdown fences or extra commentary
                 time="18:00",
                 activity="Evening leisure and dinner",
                 location=f"{destination} downtown",
+                location_address=None,
+                is_sightseeing=False,
                 estimated_cost=daily_budget * 0.30,
                 notes="Enjoy local cuisine and nightlife",
             ),
@@ -353,8 +352,35 @@ Respond with valid JSON only, do not include markdown fences or extra commentary
                 activities = [activities]
             normalized_activities = []
             for activity in activities:
-                if isinstance(activity, dict):
-                    normalized_activities.append(activity)
+                if not isinstance(activity, dict):
+                    continue
+
+                normalized_activity = dict(activity)
+
+                for text_field in ("time", "activity", "location", "notes"):
+                    value = normalized_activity.get(text_field)
+                    coerced = self._coerce_text(value)
+                    if coerced is not None:
+                        normalized_activity[text_field] = coerced
+                    elif text_field in normalized_activity:
+                        normalized_activity[text_field] = value
+
+                estimated = normalized_activity.get("estimated_cost")
+                normalized_activity["estimated_cost"] = self._coerce_currency_value(
+                    estimated
+                )
+
+                coerced_address = self._coerce_text(
+                    normalized_activity.get("location_address")
+                )
+                normalized_activity["location_address"] = coerced_address
+
+                sightseeing_value = self._coerce_bool(
+                    normalized_activity.get("is_sightseeing")
+                )
+                normalized_activity["is_sightseeing"] = sightseeing_value
+
+                normalized_activities.append(normalized_activity)
             normalized["activities"] = normalized_activities
 
             if (
@@ -362,9 +388,8 @@ Respond with valid JSON only, do not include markdown fences or extra commentary
                 or normalized["total_estimated_cost"] is None
             ):
                 normalized["total_estimated_cost"] = sum(
-                    self._coerce_currency_value(activity.get("estimated_cost")) or 0
+                    (activity.get("estimated_cost") or 0)
                     for activity in normalized_activities
-                    if isinstance(activity, dict)
                 )
             else:
                 normalized["total_estimated_cost"] = (
@@ -414,6 +439,49 @@ Respond with valid JSON only, do not include markdown fences or extra commentary
                     return float(match.group(1))
                 except ValueError:
                     return None
+
+        return None
+
+    def _coerce_text(self, value) -> Optional[str]:
+        """Normalize textual fields from LLM output."""
+
+        if value is None:
+            return None
+
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+
+        if isinstance(value, (int, float)):
+            return str(value)
+
+        if isinstance(value, list):
+            joined = " ".join(str(item).strip() for item in value if item)
+            return joined.strip() or None
+
+        if isinstance(value, dict):
+            return json.dumps(value, ensure_ascii=False)
+
+        return str(value).strip() or None
+
+    def _coerce_bool(self, value) -> Optional[bool]:
+        """Attempt to normalize boolean-like values."""
+
+        if value is None:
+            return None
+
+        if isinstance(value, bool):
+            return value
+
+        if isinstance(value, (int, float)):
+            return bool(value)
+
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"true", "yes", "y", "1", "是", "ok"}:
+                return True
+            if lowered in {"false", "no", "n", "0", "否"}:
+                return False
 
         return None
 

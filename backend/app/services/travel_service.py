@@ -95,7 +95,8 @@ class TravelService:
             "end_date": itinerary.end_date.isoformat(),
             "budget": itinerary.budget,
             "daily_itinerary": [
-                day.model_dump(mode="json") for day in itinerary.daily_itinerary
+                day.model_dump(mode="json", exclude_none=False)
+                for day in itinerary.daily_itinerary
             ],
             "total_estimated_cost": itinerary.total_estimated_cost,
             "recommendations": itinerary.recommendations,

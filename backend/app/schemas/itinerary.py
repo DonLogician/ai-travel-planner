@@ -51,6 +51,12 @@ class ActivityItem(BaseModel):
     time: str = Field(..., description="Activity time")
     activity: str = Field(..., description="Activity description")
     location: str = Field(..., description="Activity location")
+    location_address: Optional[str] = Field(
+        None, description="Detailed address or landmark information"
+    )
+    is_sightseeing: Optional[bool] = Field(
+        None, description="Whether the activity is a sightseeing event"
+    )
     estimated_cost: Optional[float] = Field(None, description="Estimated cost")
     notes: Optional[str] = Field(None, description="Additional notes")
 
@@ -95,6 +101,8 @@ class ItineraryResponse(BaseModel):
                                 "time": "09:00",
                                 "activity": "Visit Forbidden City",
                                 "location": "Forbidden City",
+                                "location_address": "北京市东城区景山前街4号",
+                                "is_sightseeing": True,
                                 "estimated_cost": 60.0,
                                 "notes": "Book tickets in advance",
                             }

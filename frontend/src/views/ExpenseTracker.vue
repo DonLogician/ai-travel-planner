@@ -1,8 +1,10 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useExpenseStore } from '../stores/expense';
+import { useItineraryStore } from '../stores/itinerary';
 
 const expenseStore = useExpenseStore();
+const itineraryStore = useItineraryStore();
 
 const showAddForm = ref(false);
 const editingExpense = ref(null);
@@ -11,8 +13,7 @@ const form = ref({
   category: 'food',
   amount: '',
   description: '',
-  location: '',
-  itinerary_id: null,
+  itinerary_id: '',
 });
 
 const categories = [
@@ -24,9 +25,23 @@ const categories = [
   { value: 'other', label: '📝 其他', color: '#95a5a6' },
 ];
 
-onMounted(() => {
-  expenseStore.fetchExpenses();
-  expenseStore.fetchExpenseSummary();
+const defaultItineraryId = computed(() => itineraryStore.itineraries[0]?.id || null);
+
+watch(defaultItineraryId, (value) => {
+  if (!form.value.itinerary_id && value) {
+    form.value.itinerary_id = value;
+  }
+});
+
+onMounted(async () => {
+  await Promise.all([
+    itineraryStore.fetchItineraries(),
+    expenseStore.fetchExpenses(),
+    expenseStore.fetchExpenseSummary(),
+  ]);
+  if (!form.value.itinerary_id) {
+    form.value.itinerary_id = defaultItineraryId.value;
+  }
 });
 
 const resetForm = () => {
@@ -34,8 +49,7 @@ const resetForm = () => {
     category: 'food',
     amount: '',
     description: '',
-    location: '',
-    itinerary_id: null,
+    itinerary_id: defaultItineraryId.value || '',
   };
   editingExpense.value = null;
   showAddForm.value = false;
@@ -43,6 +57,10 @@ const resetForm = () => {
 
 const handleSubmit = async () => {
   try {
+    if (!form.value.itinerary_id) {
+      alert('请先创建行程并选择后再记录支出');
+      return;
+    }
     if (editingExpense.value) {
       await expenseStore.updateExpense(editingExpense.value.id, form.value);
     } else {
@@ -61,8 +79,7 @@ const handleEdit = (expense) => {
     category: expense.category,
     amount: expense.amount,
     description: expense.description,
-    location: expense.location || '',
-    itinerary_id: expense.itinerary_id,
+    itinerary_id: expense.itinerary_id || '',
   };
   showAddForm.value = true;
 };
@@ -81,6 +98,26 @@ const handleDelete = async (id) => {
 const getCategoryInfo = (categoryValue) => {
   return categories.find((c) => c.value === categoryValue) || categories[categories.length - 1];
 };
+
+const itineraryLookup = computed(() => {
+  return itineraryStore.itineraries.reduce((map, itinerary) => {
+    if (itinerary?.id) {
+      map[itinerary.id] = itinerary.destination || '未命名行程';
+    }
+    return map;
+  }, {});
+});
+
+const getItineraryName = (id) => {
+  if (!id) {
+    return '未关联行程';
+  }
+  return itineraryLookup.value[id] || '未关联行程';
+};
+
+const hasItineraries = computed(() => itineraryStore.itineraries.length > 0);
+
+const canSubmit = computed(() => Boolean(form.value.itinerary_id) && Number(form.value.amount) > 0);
 
 const formatDate = (dateString) => {
   if (!dateString) return '';
@@ -141,12 +178,18 @@ const formatDate = (dateString) => {
           </div>
 
           <div class="form-group">
-            <label for="location">地点（可选）</label>
-            <input id="location" v-model="form.location" type="text" placeholder="例如：北京" />
+            <label for="itinerary">关联行程</label>
+            <select id="itinerary" v-model="form.itinerary_id" required>
+              <option disabled value="">请选择</option>
+              <option v-for="itinerary in itineraryStore.itineraries" :key="itinerary.id" :value="itinerary.id">
+                {{ itinerary.destination }}（{{ formatDate(itinerary.start_date) }}）
+              </option>
+            </select>
+            <p v-if="!hasItineraries" class="helper-text">请先创建行程后再记录支出。</p>
           </div>
 
           <div class="form-actions">
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-primary" :disabled="!canSubmit">
               {{ editingExpense ? '更新' : '新增' }}支出
             </button>
             <button type="button" @click="resetForm" class="btn btn-secondary">取消</button>
@@ -204,7 +247,7 @@ const formatDate = (dateString) => {
                 <h4>{{ expense.description }}</h4>
                 <p class="expense-meta">
                   {{ getCategoryInfo(expense.category).label }}
-                  <span v-if="expense.location"> • {{ expense.location }}</span>
+                  <span> • {{ getItineraryName(expense.itinerary_id) }}</span>
                   <span> • {{ formatDate(expense.date) }}</span>
                 </p>
               </div>
@@ -251,6 +294,18 @@ const formatDate = (dateString) => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.helper-text {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #dc3545;
 }
 
 .summary {

@@ -2,12 +2,23 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useItineraryStore } from '../stores/itinerary';
+import { useExpenseStore } from '../stores/expense';
 import { itineraryService } from '../services/itinerary';
 import ItineraryMap from '../components/ItineraryMap.vue';
 
 const route = useRoute();
 const itineraryStore = useItineraryStore();
+const expenseStore = useExpenseStore();
 const budgetStatus = ref(null);
+
+const categoryLabels = {
+  accommodation: '住宿',
+  food: '餐饮',
+  transportation: '交通',
+  activities: '活动体验',
+  shopping: '购物',
+  other: '其他',
+};
 
 const fetchBudgetStatus = async (id) => {
   try {
@@ -17,12 +28,23 @@ const fetchBudgetStatus = async (id) => {
   }
 };
 
-onMounted(async () => {
-  const id = route.params.id;
-  if (id && id !== 'new') {
-    await itineraryStore.fetchItinerary(id);
-    fetchBudgetStatus(id);
+const loadItineraryData = async (id) => {
+  if (!id || id === 'new') {
+    return;
   }
+
+  try {
+    await Promise.all([
+      itineraryStore.fetchItinerary(id),
+      expenseStore.fetchExpenses({ itinerary_id: id }),
+    ]);
+  } finally {
+    await fetchBudgetStatus(id);
+  }
+};
+
+onMounted(() => {
+  loadItineraryData(route.params.id);
 });
 
 const itinerary = computed(() => itineraryStore.currentItinerary);
@@ -96,12 +118,28 @@ const formatCurrency = (value) => {
   });
 };
 
+const formatAmount = (value) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return '0.00';
+  }
+  return Number(value).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+const itineraryExpenses = computed(() => expenseStore.expenses || []);
+
+const expensesLoading = computed(() => expenseStore.loading);
+
+const expenseBreakdown = computed(() => budgetStatus.value?.expense_breakdown || {});
+
+const getCategoryLabel = (category) => categoryLabels[category] || category;
+
 watch(
-  () => itinerary.value?.id,
+  () => route.params.id,
   (id) => {
-    if (id && id !== 'new') {
-      fetchBudgetStatus(id);
-    }
+    loadItineraryData(id);
   }
 );
 </script>
@@ -153,6 +191,46 @@ watch(
                 class="budget-progress-bar"
                 :style="{ width: `${Math.min(budgetOverview.spentPercentage, 100)}%` }"
               ></div>
+            </div>
+          </div>
+
+          <div class="expenses card">
+            <div class="expenses-header">
+              <h2>支出明细</h2>
+              <span class="expenses-total">
+                累计支出
+                <strong>{{ budgetOverview.actual !== null ? `¥${formatAmount(budgetOverview.actual)}` : '—' }}</strong>
+              </span>
+            </div>
+            <div v-if="expensesLoading" class="expenses-loading">支出加载中...</div>
+            <div v-else>
+              <div v-if="!itineraryExpenses.length" class="empty-state">
+                该行程暂无支出记录，可在「旅行账本」页面新增支出。
+              </div>
+              <div v-else class="expenses-list">
+                <div
+                  v-for="expense in itineraryExpenses"
+                  :key="expense.id"
+                  class="expenses-item"
+                >
+                  <div class="expenses-item__info">
+                    <p class="expenses-item__description">{{ expense.description }}</p>
+                    <p class="expenses-item__meta">
+                      {{ formatDate(expense.date) }} · {{ getCategoryLabel(expense.category) }}
+                    </p>
+                  </div>
+                  <span class="expenses-item__amount">¥{{ formatAmount(expense.amount) }}</span>
+                </div>
+              </div>
+              <div v-if="Object.keys(expenseBreakdown).length" class="expenses-breakdown">
+                <h3>分类汇总</h3>
+                <div class="expenses-breakdown__grid">
+                  <div v-for="(amount, category) in expenseBreakdown" :key="category" class="expenses-breakdown__item">
+                    <span class="label">{{ getCategoryLabel(category) }}</span>
+                    <span class="amount">¥{{ formatAmount(amount) }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -319,6 +397,104 @@ watch(
   height: 100%;
   background: linear-gradient(90deg, #667eea, #764ba2);
   transition: width 0.3s ease;
+}
+
+.expenses-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.expenses-total {
+  font-size: 0.95rem;
+  color: #6c757d;
+}
+
+.expenses-total strong {
+  margin-left: 0.25rem;
+  font-size: 1.25rem;
+  color: #2c3e50;
+}
+
+.expenses-loading {
+  text-align: center;
+  padding: 1rem;
+  color: #6c757d;
+}
+
+.expenses-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.expenses-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  background: #f8f9ff;
+  border: 1px solid rgba(102, 126, 234, 0.15);
+}
+
+.expenses-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 70%;
+}
+
+.expenses-item__description {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 0.35rem;
+}
+
+.expenses-item__meta {
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+.expenses-item__amount {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.expenses-breakdown {
+  margin-top: 1.75rem;
+  border-top: 1px solid #f0f0f0;
+  padding-top: 1.5rem;
+}
+
+.expenses-breakdown h3 {
+  color: #2c3e50;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.expenses-breakdown__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.expenses-breakdown__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border-radius: 0.5rem;
+  color: #495057;
+}
+
+.expenses-breakdown__item .amount {
+  font-weight: 600;
+  color: #2c3e50;
 }
 
 .recommendations {

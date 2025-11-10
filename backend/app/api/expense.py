@@ -22,6 +22,11 @@ async def create_expense(
     """
     try:
         return await expense_service.create_expense(user_id, expense)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -88,7 +93,16 @@ async def update_expense(
     """
     Update an existing expense.
     """
-    expense = await expense_service.update_expense(expense_id, user_id, expense_update)
+    try:
+        expense = await expense_service.update_expense(
+            expense_id, user_id, expense_update
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
     if not expense:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

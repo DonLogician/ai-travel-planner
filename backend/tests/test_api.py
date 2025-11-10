@@ -30,9 +30,9 @@ def test_create_itinerary():
         "end_date": "2024-03-17",
         "budget": 5000.0,
         "preferences": ["cultural", "food"],
-        "additional_notes": "Prefer public transportation"
+        "additional_notes": "Prefer public transportation",
     }
-    
+
     response = client.post("/api/itineraries/", json=itinerary_request)
     assert response.status_code == 201
     data = response.json()
@@ -44,26 +44,24 @@ def test_create_itinerary():
 def test_expense_creation():
     """Test expense creation endpoint."""
     expense_data = {
+        "itinerary_id": "itin_test",
         "category": "food",
         "amount": 120.5,
         "description": "Dinner at local restaurant",
-        "location": "Beijing"
     }
-    
+
     response = client.post("/api/expenses/", json=expense_data)
     assert response.status_code == 201
     data = response.json()
     assert data["amount"] == 120.5
     assert data["category"] == "food"
+    assert data["itinerary_id"] == "itin_test"
 
 
 def test_location_search():
     """Test location search endpoint."""
-    search_request = {
-        "query": "Forbidden City",
-        "city": "Beijing"
-    }
-    
+    search_request = {"query": "Forbidden City", "city": "Beijing"}
+
     response = client.post("/api/navigation/search", json=search_request)
     assert response.status_code == 200
     data = response.json()
@@ -76,9 +74,9 @@ def test_route_planning():
     route_request = {
         "origin": "Beijing Railway Station",
         "destination": "Forbidden City",
-        "mode": "transit"
+        "mode": "transit",
     }
-    
+
     response = client.post("/api/navigation/route", json=route_request)
     assert response.status_code == 200
     data = response.json()

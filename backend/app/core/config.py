@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # Supabase
     SUPABASE_URL: str
     SUPABASE_KEY: str
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
 
     # iFlytek API
     IFLYTEK_APP_ID: Optional[str] = None

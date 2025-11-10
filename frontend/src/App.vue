@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <nav class="navbar">
+    <nav v-if="showNav" class="navbar">
       <div class="container">
         <router-link to="/" class="nav-brand">🧳 AI 智能旅行助手</router-link>
         <div class="nav-links">
@@ -8,6 +8,7 @@
           <router-link to="/itineraries">我的行程</router-link>
           <router-link to="/itineraries/create">创建行程</router-link>
           <router-link to="/expenses">旅行账本</router-link>
+          <button class="link" v-if="userStore.profile" @click="logout">退出登录</button>
         </div>
       </div>
     </nav>
@@ -16,13 +17,30 @@
       <router-view />
     </main>
 
-    <footer class="footer">
+    <footer v-if="showNav" class="footer">
       <div class="container">
         <p>&copy; 2024 AI 智能旅行助手 · 为你打造个性化旅程体验</p>
       </div>
     </footer>
   </div>
 </template>
+
+<script setup>
+import { computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useUserStore } from '@/stores/user';
+
+const route = useRoute();
+const router = useRouter();
+const userStore = useUserStore();
+
+const showNav = computed(() => route.name !== 'Auth');
+
+const logout = () => {
+  userStore.clearSession();
+  router.push({ name: 'Auth' });
+};
+</script>
 
 <style>
 * {
@@ -73,6 +91,19 @@ body {
   color: white;
   text-decoration: none;
   transition: opacity 0.3s;
+}
+
+.nav-links .link {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: opacity 0.3s;
+}
+
+.nav-links .link:hover {
+  opacity: 0.8;
 }
 
 .nav-links a:hover {

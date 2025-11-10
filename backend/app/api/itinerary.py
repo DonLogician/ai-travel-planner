@@ -6,15 +6,10 @@ from app.schemas.itinerary import (
     ItineraryTextRequest,
     ItineraryFromTextResponse,
 )
+from app.api.deps import get_current_user_id
 from app.services.travel_service import travel_service
 
 router = APIRouter(prefix="/itineraries", tags=["Itineraries"])
-
-
-# Mock authentication dependency (replace with real auth)
-async def get_current_user_id() -> str:
-    """Mock function to get current user ID. Replace with real authentication."""
-    return "user_123"
 
 
 @router.post("/", response_model=ItineraryResponse, status_code=status.HTTP_201_CREATED)

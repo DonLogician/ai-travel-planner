@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.logging import get_logger, setup_logging
-from app.api import itinerary, expense, navigation, voice
+from app.api import auth, itinerary, expense, navigation, voice
 
 
 # Initialize logging before creating the application instance.
@@ -30,6 +30,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router, prefix="/api")
 app.include_router(itinerary.router, prefix="/api")
 app.include_router(expense.router, prefix="/api")
 app.include_router(navigation.router, prefix="/api")

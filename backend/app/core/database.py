@@ -4,19 +4,17 @@ from app.core.config import settings
 
 class SupabaseClient:
     """Supabase client wrapper for database and auth operations."""
-    
+
     _instance = None
     _client: Client = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(SupabaseClient, cls).__new__(cls)
-            cls._client = create_client(
-                settings.SUPABASE_URL,
-                settings.SUPABASE_KEY
-            )
+            supabase_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
+            cls._client = create_client(settings.SUPABASE_URL, supabase_key)
         return cls._instance
-    
+
     @property
     def client(self) -> Client:
         """Get Supabase client instance."""

@@ -12,9 +12,9 @@ const apiClient = axios.create({
 // Request interceptor for adding auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    const userId = localStorage.getItem('userId');
+    if (userId) {
+      config.headers['X-User-ID'] = userId;
     }
     return config;
   },
@@ -24,3 +24,8 @@ apiClient.interceptors.request.use(
 );
 
 export default apiClient;
+
+export const clearAuthHeader = () => {
+  localStorage.removeItem('userId');
+  localStorage.removeItem('username');
+};

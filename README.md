@@ -4,15 +4,22 @@ ai-travel-planner/
 一个面向中文用户的智能旅行规划平台，通过大语言模型理解需求、自动生成行程，并提供预算管理、地图导航与语音交互等全流程辅助工具。本项目为“大模型辅助软件工程”课程作业，包含前后端完整实现与相关文档。
 
 ## 目录
-- [功能亮点](#功能亮点)
-- [系统架构](#系统架构)
-- [环境准备](#环境准备)
-- [快速开始](#快速开始)
-- [环境变量说明](#环境变量说明)
-- [数据库结构](#数据库结构)
-- [常用命令](#常用命令)
-- [常见问题](#常见问题)
-- [更多资料](#更多资料)
+- [AI 旅行规划助手](#ai-旅行规划助手)
+  - [目录](#目录)
+  - [功能亮点](#功能亮点)
+  - [系统架构](#系统架构)
+  - [环境准备](#环境准备)
+  - [快速开始](#快速开始)
+    - [方案一：Docker Compose（推荐）](#方案一docker-compose推荐)
+    - [方案二：本地开发（Conda + npm）](#方案二本地开发conda--npm)
+  - [环境变量说明](#环境变量说明)
+    - [根目录 `.env`](#根目录-env)
+    - [`backend/.env`](#backendenv)
+    - [`frontend/.env`](#frontendenv)
+  - [数据库结构](#数据库结构)
+  - [常用命令](#常用命令)
+  - [常见问题](#常见问题)
+  - [更多资料](#更多资料)
 
 ## 功能亮点
 - **智能行程规划**：支持语音或文字输入需求，使用千问（Qwen）或豆包（Doubao）大模型生成“日程+预算+推荐”的完整旅行方案。
@@ -148,6 +155,11 @@ CREATE TABLE IF NOT EXISTS expenses (
   location TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  user_id TEXT NOT NULL,
+  password TEXT
 );
 ```
 
